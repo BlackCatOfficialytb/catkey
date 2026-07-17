@@ -91,3 +91,9 @@ reproducible and ship source alongside any binary you share.
 
 **Trust note:** because an input method sees everything you type, only run
 builds you can verify from source. See the verification guidance above.
+
+**Modified versions (GPLv3 §7 additional terms):** if you distribute a
+modified version, you must rename it, change its logo/icon, and mark it as
+different from the original. You may not use the "CatKey" or
+"BlackCatOfficial" names or logos to brand/endorse modified or derived
+products without prior written permission. See [`LICENSE`](LICENSE).

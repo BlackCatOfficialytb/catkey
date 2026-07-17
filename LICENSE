@@ -32,6 +32,27 @@ License (GPL). Because CatKey derives from that GPL-covered code, it
 is necessarily licensed under the GPL too (version 3 or, at your
 option, any later version). The full text of the GPLv3 follows.
 
+----------------------------------------------------------------------
+
+ADDITIONAL TERMS under GPLv3 Section 7:
+
+The following additional terms apply to this program, as permitted by
+Section 7 of the GNU General Public License version 3. They do not
+restrict the freedoms granted by the GPL; per GPLv3 §7 they may be
+removed by a recipient with respect to material they receive.
+
+  (a) Naming and branding of modified versions (GPLv3 §7(c)).
+      If you distribute a modified version of this program, you must
+      change its name, change its logo/icon, and mark it in reasonable
+      ways as different from the original, so users are not misled into
+      thinking your modified version is the official CatKey.
+
+  (b) Trademarks (GPLv3 §7(e)).
+      This license does NOT grant permission to use the names, logos,
+      or trademarks "CatKey" or "BlackCatOfficial" (or confusingly
+      similar marks) to endorse, promote, or brand modified versions or
+      derived products, without prior written permission.
+
 
                            Preamble
 

@@ -82,3 +82,9 @@ hoặc phiên bản mới hơn. Xem [`../LICENSE`](../LICENSE).
 phái sinh — cũng phải dùng GPL. (Xem ghi chú trong `LICENSE`.) Điều này
 cũng có nghĩa mã nguồn CatKey luôn phải công khai; hãy giữ bản build có thể
 tái tạo và đi kèm mã nguồn khi chia sẻ.
+
+**Bản sửa đổi (điều khoản bổ sung theo GPLv3 §7):** nếu bạn phân phối bản
+sửa đổi, bạn phải đổi tên, đổi logo/biểu tượng và đánh dấu rõ là khác với
+bản gốc. Bạn không được dùng tên hay logo "CatKey" hoặc "BlackCatOfficial"
+để gắn nhãn/quảng bá bản sửa đổi hay sản phẩm phái sinh khi chưa được cho
+phép bằng văn bản. Xem [`../LICENSE`](../LICENSE).
