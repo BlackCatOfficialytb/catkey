@@ -17,7 +17,16 @@ _METHOD_TEIP = 1
 _METHOD_VNI = 2
 _MAX_OUTPUT = 128
 
-_CORE_DIR = Path(__file__).resolve().parent.parent / "catkey_core"
+def _data_root() -> Path:
+    base = getattr(sys, "_MEIPASS", None)
+    if base:
+        return Path(base)
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+_CORE_DIR = _data_root() / "catkey_core"
 
 
 def _lib_names():

@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Build / packaging output
+build/
+dist/
+**/build/
+**/dist/
+*.spec
+*.build/
+*.dist/
+*.onefile-build/
+
+# Native build artifacts
+*.obj
+*.o
+*.exp
+*.lib
+*.dll
+*.so
+*.dylib
+*.pdb
+*.ilk
+
+# gettext compiled catalogs (regenerated from .po)
+*.mo
+
+# Runtime config / logs
+config.json
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

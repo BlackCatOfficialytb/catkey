@@ -12,12 +12,24 @@ Usage:
 """
 
 import gettext
+import sys
 from pathlib import Path
 
 LANG_EN = "en"
 LANG_VI = "vi"
 
-_LOCALE_DIR = Path(__file__).resolve().parent.parent / "locales"
+
+def _data_root() -> Path:
+    # Frozen (PyInstaller/Nuitka onefile) bundles data next to _MEIPASS/exe.
+    base = getattr(sys, "_MEIPASS", None)
+    if base:
+        return Path(base)
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+_LOCALE_DIR = _data_root() / "locales"
 _DOMAIN = "catkey"
 
 _current = LANG_EN
