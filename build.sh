@@ -43,20 +43,33 @@ clean_artifacts() {
 
 if [ "$CLEAN" -eq 1 ]; then clean_artifacts; echo "Cleaned."; exit 0; fi
 
-# The native core must exist so it can be bundled.
-# Load core.py directly (not via the package) so we don't pull in PySide6 /
-# Qt GUI libs just to trigger the C-core build.
-if ! ls "$CORE_DIR"/libcatkey_core.* "$CORE_DIR"/catkey_core.dll >/dev/null 2>&1; then
+# The native core must exist so it can be bundled. Build it directly with
+# the system compiler (no Python/PySide6 import needed).
+if [ "$(uname)" = "Darwin" ]; then
+    CORE_LIB="$CORE_DIR/libcatkey_core.dylib"
+elif [ "$(uname)" = "Linux" ]; then
+    CORE_LIB="$CORE_DIR/libcatkey_core.so"
+else
+    CORE_LIB="$CORE_DIR/catkey_core.dll"
+fi
+
+if [ ! -f "$CORE_LIB" ]; then
     echo "Native core not found - building it..."
-    "$PYTHON" -c "import importlib.util, sys
-spec = importlib.util.spec_from_file_location('catkey_core_bind', r'$ROOT/catkey_ui/core.py')
-m = importlib.util.module_from_spec(spec)
-sys.modules['catkey_core_bind'] = m
-spec.loader.exec_module(m)
-print('core built:', m.core_available())"
-    if ! ls "$CORE_DIR"/libcatkey_core.* "$CORE_DIR"/catkey_core.dll >/dev/null 2>&1; then
+    if [ "$(uname)" = "Linux" ]; then
+        # Match catkey_ui/core.py: the Linux .so is the conversion engine only
+        # (the X11 daemon is a separate program, not loaded by the app).
+        cc -shared -fPIC -O2 -o "$CORE_LIB" \
+            "$CORE_DIR/vietnamese_tep.c" 2>&1 || {
+            echo "Failed to build the native core (need gcc/cc)." >&2; exit 1; }
+    elif [ "$(uname)" = "Darwin" ]; then
+        cc -shared -fPIC -O2 -o "$CORE_LIB" \
+            "$CORE_DIR/vietnamese_tep.c" 2>&1 || {
+            echo "Failed to build the native core (need clang)." >&2; exit 1; }
+    fi
+    if [ ! -f "$CORE_LIB" ]; then
         echo "Failed to build the native core. Build it manually first." >&2; exit 1
     fi
+    echo "core built: $CORE_LIB"
 fi
 
 clean_artifacts

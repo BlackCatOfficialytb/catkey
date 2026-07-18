@@ -76,7 +76,7 @@ jobs:
 
   linux:
     name: Linux (PyInstaller)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -112,7 +112,7 @@ jobs:
     name: Release assets
     needs: [windows-pyinstaller, windows-nuitka, linux]
     if: github.event_name == 'release'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v5
         with:
