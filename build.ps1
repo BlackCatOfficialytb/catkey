@@ -93,14 +93,16 @@ if (-not (Test-Path $Dll)) {
         }
         $msys = "C:\msys64\msys2_shell.cmd"
         if (-not (Test-Path $msys)) { throw "MSYS2 not found at $msys." }
-        $tool = if ($Arch -eq 'arm64') { 'clang' } else { 'gcc' }
+        # NOTE: PowerShell variables are case-insensitive, so we must NOT name
+        # this $tool (it would clobber the -$Tool parameter). Use $cc.
+        $cc = if ($Arch -eq 'arm64') { 'clang' } else { 'gcc' }
         # MinGW needs the .def as a plain input file to export symbols
         # (functions in vietnamese_tep.c are not __declspec(dllexport)).
         # cd into the core dir so the relative .def path resolves.
         $relSrcs = ($srcs | ForEach-Object { '"{0}"' -f (Split-Path $_ -Leaf) }) -join ' '
         $cmd = ('C:\msys64\msys2_shell.cmd -{0} -defterm -no-start -here -c ' +
                 '"cd \"{1}\" && {2} -shared -O2 -o \"{3}\" {4} catkey_core.def -Wl,--kill-at -luser32"' `
-                -f $envs[$Arch], $CoreDir, $tool, $Dll, $relSrcs)
+                -f $envs[$Arch], $CoreDir, $cc, $Dll, $relSrcs)
         cmd /c $cmd | Out-Null
         if (-not (Test-Path $Dll)) { throw "MinGW ($Arch) build failed." }
     }
