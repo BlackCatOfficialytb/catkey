@@ -127,13 +127,13 @@ find "$CORE_DIR" -maxdepth 1 -type f \( -name '*.so' -o -name '*.dylib' -o -name
 
 if [ "$TOOL" = "pyinstaller" ]; then
     "$PYTHON" -m pip install --quiet --upgrade pyinstaller
-    ARGS=(-m PyInstaller --noconfirm --clean --name "$NAME" --windowed
+    ARGS=(-m PyInstaller --noconfirm --clean --name "$NAME-$SUFFIX" --windowed
           --add-data "$STAGE:catkey_core"
           --add-data "$LOCALES:locales")
     if [ "$ONEFILE" -eq 1 ]; then ARGS+=(--onefile); else ARGS+=(--onedir); fi
     ARGS+=("$ENTRY")
     "$PYTHON" "${ARGS[@]}"
-    if [ "$ONEFILE" -eq 1 ]; then OUT="$ROOT/dist/$NAME-$SUFFIX"; else OUT="$ROOT/dist/$NAME-$SUFFIX/$NAME"; fi
+    if [ "$ONEFILE" -eq 1 ]; then OUT="$ROOT/dist/$NAME-$SUFFIX"; else OUT="$ROOT/dist/$NAME-$SUFFIX/$NAME-$SUFFIX"; fi
 elif [ "$TOOL" = "nuitka" ]; then
     "$PYTHON" -m pip install --quiet --upgrade nuitka
     if [ "$ONEFILE" -eq 1 ]; then MODE="--onefile"; else MODE="--standalone"; fi

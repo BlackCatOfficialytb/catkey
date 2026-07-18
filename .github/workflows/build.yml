@@ -18,35 +18,34 @@ env:
 
 jobs:
   windows:
-    name: Windows ${{ matrix.arch }} (${{ matrix.compiler }})
+    name: Windows ${{ matrix.arch }} (${{ matrix.compiler }} / ${{ matrix.tool }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
+        # NOTE: x86 (32-bit) and arm64 Windows are intentionally excluded:
+        # PySide6 ships no 32-bit wheels (x86 build impossible), and arm64
+        # Python isn't installable on the x64 GitHub runner. Only x64 builds.
         include:
-          - { arch: x64,   compiler: msvc,  pyarch: x64,   tool: pyinstaller }
-          - { arch: x64,   compiler: mingw, pyarch: x64,   tool: pyinstaller }
-          - { arch: x86,   compiler: msvc,  pyarch: x86,   tool: pyinstaller }
-          - { arch: x86,   compiler: mingw, pyarch: x86,   tool: pyinstaller }
-          - { arch: arm64, compiler: msvc,  pyarch: arm64, tool: pyinstaller }
-          - { arch: arm64, compiler: mingw, pyarch: arm64, tool: pyinstaller }
+          - { arch: x64, compiler: msvc,  tool: pyinstaller }
+          - { arch: x64, compiler: msvc,  tool: nuitka }
+          - { arch: x64, compiler: mingw, tool: pyinstaller }
+          - { arch: x64, compiler: mingw, tool: nuitka }
     steps:
       - uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.pyarch }}
+      - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.13"
-          architecture: ${{ matrix.pyarch }}
 
       - name: Install MSYS2 (MinGW)
         if: matrix.compiler == 'mingw'
         uses: msys2/setup-msys2@v2
         with:
-          msystem: ${{ matrix.arch == 'x86' && 'mingw32' || (matrix.arch == 'arm64' && 'clangarm64' || 'mingw64') }}
+          msystem: mingw64
           update: true
-          install: >-
-            ${{ matrix.arch == 'arm64' && 'mingw-w64-clang-aarch64-toolchain' || 'mingw-w64-i686-gcc mingw-w64-x86_64-gcc' }}
+          install: mingw-w64-x86_64-gcc
 
       - name: Install deps
         run: |
@@ -66,20 +65,19 @@ jobs:
           if-no-files-found: error
 
   linux:
-    name: Linux ${{ matrix.arch }} (${{ matrix.compiler }})
+    name: Linux ${{ matrix.arch }} (${{ matrix.compiler }} / ${{ matrix.tool }})
     # TODO: switch to ubuntu-26.04 once that runner image is published by GitHub.
     runs-on: ubuntu-24.04
-    continue-on-error: ${{ matrix.allow_fail || false }}
     strategy:
       fail-fast: false
       matrix:
+        # NOTE: x86 (32-bit) Linux is excluded: PyInstaller needs an x86 Python
+        # interpreter, which the default x86_64 runner cannot run. Only x64.
         include:
           - { arch: x64, compiler: gcc,   tool: pyinstaller }
+          - { arch: x64, compiler: gcc,   tool: nuitka }
           - { arch: x64, compiler: clang, tool: pyinstaller }
-          # x86 needs a 32-bit (i386) userland, which the default x86_64 runner
-          # lacks; these are best-effort and may need an i386-capable runner.
-          - { arch: x86, compiler: gcc,   tool: pyinstaller, allow_fail: true }
-          - { arch: x86, compiler: clang, tool: pyinstaller, allow_fail: true }
+          - { arch: x64, compiler: clang, tool: nuitka }
     steps:
       - uses: actions/checkout@v5
 
@@ -96,12 +94,6 @@ jobs:
                 libxcb-image0 libxcb-shm0 libxcb-randr0 libxcb-render-util0
                 libxcb-xkb1 libxcb1 libfontconfig1 libfreetype6"
           if [ "${{ matrix.compiler }}" = "clang" ]; then PKGS="$PKGS clang lld"; fi
-          if [ "${{ matrix.arch }}" = "x86" ]; then
-            PKGS="$PKGS gcc-multilib g++-multilib libc6-dev-i386 libgl1:i386 libegl1:i386"
-            # 32-bit Python for PyInstaller (best-effort; needs i386 support)
-            sudo dpkg --add-architecture i386 || true
-            sudo apt-get update || true
-          fi
           sudo apt-get install -y $PKGS
           python -m pip install --upgrade pip
           pip install PySide6-Essentials pynput ${{ matrix.tool }}
@@ -112,7 +104,6 @@ jobs:
           CC=${{ matrix.compiler }} ./build.sh --tool ${{ matrix.tool }} --arch ${{ matrix.arch }} --compiler ${{ matrix.compiler }}
 
       - name: Upload artifact
-        if: ${{ !matrix.allow_fail }}
         uses: actions/upload-artifact@v5
         with:
           name: CatKey-Linux-${{ matrix.arch }}-${{ matrix.compiler }}-${{ matrix.tool }}
