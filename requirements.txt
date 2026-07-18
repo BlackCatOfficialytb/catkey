@@ -1,13 +1,24 @@
-# CatKey runtime requirements
-# Install: pip install -r requirements.txt
+# CatKey requirements
 #
-# Runtime (needed to run run_ui.py / a frozen build's deps):
+# Install modes (PEP 508 extras markers):
+#   pip install -r requirements.txt                 # runtime + Nuitka (basic)
+#   pip install -r requirements.txt --extra onefile  # + Nuitka[app] for onefile
+#   pip install -r requirements.txt --extra all      # + Nuitka[all] (everything)
+#   pip install -r requirements.txt --extra build     # + PyInstaller
+
+# --- Runtime (needed to run run_ui.py) ---
 PySide6-Essentials>=6.5
 pynput>=1.8
 
-# Build / packaging (install only to build distributables):
-#   pip install -r requirements.txt -r requirements-build.txt
-# or use the optional group below (PEP 508 / pip 21.2+ extras-style markers).
-# All-latest:
-Nuitka[all] ; extra == "build"
+# --- Nuitka ---
+# Base: Nuitka (basic packaging backend).
+Nuitka>=2.4
+
+# `--extra onefile`: Nuitka with onefile-supporting dependencies (Nuitka[app]).
+Nuitka[app] ; extra == "onefile"
+
+# `--extra all`: Nuitka with every optional dependency (Nuitka[all]).
+Nuitka[all] ; extra == "all"
+
+# `--extra build`: PyInstaller backend (alternative to Nuitka).
 pyinstaller>=6.0 ; extra == "build"
