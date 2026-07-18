@@ -44,9 +44,16 @@ clean_artifacts() {
 if [ "$CLEAN" -eq 1 ]; then clean_artifacts; echo "Cleaned."; exit 0; fi
 
 # The native core must exist so it can be bundled.
+# Load core.py directly (not via the package) so we don't pull in PySide6 /
+# Qt GUI libs just to trigger the C-core build.
 if ! ls "$CORE_DIR"/libcatkey_core.* "$CORE_DIR"/catkey_core.dll >/dev/null 2>&1; then
     echo "Native core not found - building it..."
-    "$PYTHON" -c "import sys; sys.path.insert(0, r'$ROOT'); from catkey_ui import core; print('core built:', core.core_available())"
+    "$PYTHON" -c "import importlib.util, sys
+spec = importlib.util.spec_from_file_location('catkey_core_bind', r'$ROOT/catkey_ui/core.py')
+m = importlib.util.module_from_spec(spec)
+sys.modules['catkey_core_bind'] = m
+spec.loader.exec_module(m)
+print('core built:', m.core_available())"
     if ! ls "$CORE_DIR"/libcatkey_core.* "$CORE_DIR"/catkey_core.dll >/dev/null 2>&1; then
         echo "Failed to build the native core. Build it manually first." >&2; exit 1
     fi

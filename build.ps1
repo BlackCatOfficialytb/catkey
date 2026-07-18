@@ -45,7 +45,13 @@ if ($Clean) { Remove-Artifacts; Write-Host 'Cleaned.' -ForegroundColor Green; ex
 $Dll = Join-Path $CoreDir 'catkey_core.dll'
 if (-not (Test-Path $Dll)) {
     Write-Host 'catkey_core.dll not found - building it...' -ForegroundColor Yellow
-    & $Python -c "import sys; sys.path.insert(0, r'$Root'); from catkey_ui import core; print('core built:', core.core_available())"
+    & $Python -c @"
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('catkey_core_bind', r'$Root\catkey_ui\core.py')
+m = importlib.util.module_from_spec(spec); sys.modules['catkey_core_bind'] = m
+spec.loader.exec_module(m)
+print('core built:', m.core_available())
+"@
     if (-not (Test-Path $Dll)) { throw "Failed to build catkey_core.dll. Build it manually first." }
 }
 
