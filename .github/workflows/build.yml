@@ -14,10 +14,10 @@ jobs:
     name: Windows (PyInstaller)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -36,7 +36,7 @@ jobs:
           ./build.ps1 -Tool pyinstaller
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: CatKey-Windows-PyInstaller
           path: dist/CatKey
@@ -46,10 +46,10 @@ jobs:
     name: Windows (Nuitka)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -68,7 +68,7 @@ jobs:
           ./build.ps1 -Tool nuitka
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: CatKey-Windows-Nuitka
           path: dist/run_ui.dist
@@ -78,10 +78,10 @@ jobs:
     name: Linux (PyInstaller)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -102,7 +102,7 @@ jobs:
           ./build.sh --tool pyinstaller
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: CatKey-Linux-PyInstaller
           path: dist/CatKey
@@ -114,7 +114,7 @@ jobs:
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: artifacts
       - name: Publish release assets
