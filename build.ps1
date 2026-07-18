@@ -75,13 +75,29 @@ if (-not (Test-Path $Dll)) {
         $msys = "C:\msys64\msys2_shell.cmd"
         if (-not (Test-Path $msys)) { throw "MSYS2 not found at $msys." }
         $tool = if ($Arch -eq 'arm64') { 'clang' } else { 'gcc' }
+        # MinGW needs the .def as a plain input file to export symbols
+        # (functions in vietnamese_tep.c are not __declspec(dllexport)).
+        # cd into the core dir so the relative .def path resolves.
+        $relSrcs = ($srcs | ForEach-Object { '"{0}"' -f (Split-Path $_ -Leaf) }) -join ' '
         $cmd = ('C:\msys64\msys2_shell.cmd -{0} -defterm -no-start -here -c ' +
-                '"{1} -shared -O2 -o \"{2}\" \"{3}\" \"{4}\" -luser32"' `
-                -f $envs[$Arch], $tool, $Dll, $srcs[0], $srcs[1])
+                '"cd \"{1}\" && {2} -shared -O2 -o \"{3}\" {4} catkey_core.def -Wl,--kill-at -luser32"' `
+                -f $envs[$Arch], $CoreDir, $tool, $Dll, $relSrcs)
         cmd /c $cmd | Out-Null
         if (-not (Test-Path $Dll)) { throw "MinGW ($Arch) build failed." }
     }
     Write-Host "core built: $Dll" -ForegroundColor Green
+    # Verify the required symbol is actually exported (MinGW omits it
+    # without the .def; would fail only at runtime in the bundled exe).
+    & $Python -c @"
+import ctypes, sys
+try:
+    lib = ctypes.CDLL(r'$Dll')
+    _ = lib.catkey_convert_word
+    print('export OK: catkey_convert_word')
+except Exception as e:
+    print('EXPORT CHECK FAILED:', e, file=sys.stderr); sys.exit(1)
+"@
+    if ($LASTEXITCODE -ne 0) { throw "Native core missing required exports." }
 }
 
 # Suffix to keep matrix outputs (arch/compiler) from colliding.
@@ -102,14 +118,14 @@ if ($Tool -eq 'pyinstaller') {
     & $Python -m pip install --quiet --upgrade pyinstaller
     $args = @(
         '-m', 'PyInstaller', '--noconfirm', '--clean',
-        '--name', $Name, '--windowed',
+        '--name', "$Name-$Suffix", '--windowed',
         '--add-data', "$Stage;catkey_core",
         '--add-data', "$Locales;locales"
     )
     $args += $OneFile ? '--onefile' : '--onedir'
     $args += $Entry
     & $Python @args
-    $out = $OneFile ? (Join-Path $Root "dist\$Name-$Suffix.exe") : (Join-Path $Root "dist\$Name-$Suffix\$Name.exe")
+    $out = $OneFile ? (Join-Path $Root "dist\$Name-$Suffix.exe") : (Join-Path $Root "dist\$Name-$Suffix\$Name-$Suffix.exe")
 }
 else {
     & $Python -m pip install --quiet --upgrade nuitka
