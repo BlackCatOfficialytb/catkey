@@ -1,0 +1,13 @@
+# CatKey runtime requirements
+# Install: pip install -r requirements.txt
+#
+# Runtime (needed to run run_ui.py / a frozen build's deps):
+PySide6-Essentials>=6.5
+pynput>=1.8
+
+# Build / packaging (install only to build distributables):
+#   pip install -r requirements.txt -r requirements-build.txt
+# or use the optional group below (PEP 508 / pip 21.2+ extras-style markers).
+# All-latest:
+Nuitka[all] ; extra == "build"
+pyinstaller>=6.0 ; extra == "build"

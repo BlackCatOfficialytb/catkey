@@ -2,15 +2,29 @@
 .SYNOPSIS
     Build CatKey into a standalone executable using PyInstaller or Nuitka.
 
+.DESCRIPTION
+    Builds the native C core (catkey_core.dll) for the requested arch/compiler,
+    stages it, then packages the PySide6 app via PyInstaller (onedir/onefile)
+    or Nuitka (standalone/onefile). Output is placed under dist/ and suffixed
+    by arch and compiler so matrix builds don't collide.
+
 .EXAMPLE
-    .\build.ps1                       # PyInstaller, onedir (default)
-    .\build.ps1 -Tool nuitka          # Nuitka, standalone
-    .\build.ps1 -OneFile              # single-file exe
+    .\build.ps1                       # PyInstaller onedir, x64, MSVC
+    .\build.ps1 -Tool nuitka          # Nuitka standalone
+    .\build.ps1 -OneFile              # single-file exe (PyInstaller)
     .\build.ps1 -Tool nuitka -OneFile # Nuitka onefile
+    .\build.ps1 -Arch x86 -Compiler mingw   # 32-bit Windows build via MSYS2
+    .\build.ps1 -Arch arm64 -Compiler msvc  # ARM64 Windows via MSVC
     .\build.ps1 -Clean                # remove build artifacts and exit
+    .\build.ps1 -Help                  # show this help and exit
+
+.NOTES
+    Requires: Python 3.11+ and a C compiler (MSVC vcvars64/32/arm64, or MSYS2
+    mingw64/mingw32/clangarm64). See requirements.txt.
 #>
 [CmdletBinding()]
 param(
+    [switch]$Help,
     [ValidateSet('pyinstaller', 'nuitka')]
     [string]$Tool = 'pyinstaller',
     [switch]$OneFile,
@@ -21,6 +35,11 @@ param(
     [ValidateSet('msvc', 'mingw')]
     [string]$Compiler = 'msvc'
 )
+
+if ($Help) {
+    Get-Help $PSCommandPath -Detailed | Out-String | Write-Host
+    exit 0
+}
 
 $ErrorActionPreference = 'Stop'
 $Root = $PSScriptRoot

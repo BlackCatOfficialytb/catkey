@@ -6,7 +6,12 @@
 #   ./build.sh --tool nuitka       # Nuitka, standalone
 #   ./build.sh --onefile           # single-file exe
 #   ./build.sh --tool nuitka --onefile
+#   ./build.sh --arch x86 --compiler clang   # x86 Linux build via clang
+#   ./build.sh --arch x64 --compiler gcc     # x64 Linux build via gcc
 #   ./build.sh --clean             # remove build artifacts and exit
+#   ./build.sh --help              # show this help and exit
+#
+# Requires: Python 3.11+ and a C compiler (gcc or clang). See requirements.txt.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +19,35 @@ NAME="CatKey"
 ENTRY="$ROOT/run_ui.py"
 CORE_DIR="$ROOT/catkey_core"
 LOCALES="$ROOT/locales"
+
+show_help() {
+    cat <<EOF
+Usage: $0 [options]
+
+Build CatKey into a standalone executable using PyInstaller or Nuitka.
+
+Options:
+  --tool pyinstaller|nuitka   Packaging backend (default: pyinstaller)
+  --onefile                   Build a single self-extracting executable
+                              (PyInstaller onefile / Nuitka onefile)
+  --arch x86|x64              Target architecture (default: x64)
+  --compiler gcc|clang        Native-core compiler (default: gcc)
+  --python PATH               Python interpreter to use
+                              (default: ../.venv/bin/python or python3)
+  --clean                     Remove build artifacts (build/, dist/, *.spec)
+                              and exit
+  --help                      Show this help and exit
+
+Output:
+  dist/CatKey-<arch>-<compiler>/   PyInstaller onedir
+  dist/CatKey-<arch>-<compiler>.exe (Windows onefile)
+  dist/<arch>-<compiler>/run_ui.dist/  Nuitka standalone
+
+Requirements:
+  Python 3.11+; gcc or clang; PySide6-Essentials, pynput, pyinstaller
+  (and Nuitka for the Nuitka backend). See requirements.txt.
+EOF
+}
 
 TOOL="pyinstaller"
 ONEFILE=0
@@ -24,6 +58,7 @@ COMPILER="gcc"
 
 while [ $# -gt 0 ]; do
     case "$1" in
+        --help|-h) show_help; exit 0 ;;
         --tool) TOOL="$2"; shift 2 ;;
         --onefile) ONEFILE=1; shift ;;
         --clean) CLEAN=1; shift ;;
