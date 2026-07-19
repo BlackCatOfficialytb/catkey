@@ -22,7 +22,7 @@ EVKey-style interface.
 **Only run CatKey builds you can verify.** As a community guideline (not a
 license term — CatKey is GPLv3, which permits any distribution including
 commercial), we strongly discourage obfuscated/packed binaries and ask that
-builds be independently verifiable before they are shared.
+builds should be independently verifiable before they are shared.
 
 Here is why this matters. UniKey is the best-known Vietnamese IME. Its
 **official** website is **unikey.org**. A separate site, **unikey.vn**,
@@ -31,7 +31,7 @@ builds bundled with unwanted/possibly-malicious software, without a valid
 digital signature. Because an input method sees every keystroke you type,
 a tampered build is extremely dangerous.
 
-CatKey's guideline: a shared build should come from published source, be
+CatKey's guideline: a shared build should come from a published source, be
 reproducible, ship checksums, and ideally be reproduced by at least one
 independent party before it is offered for download. If a CatKey download
 is packed, unsigned, or you can't match its checksum to a reproducible
@@ -81,6 +81,7 @@ requirements in [`LICENSE`](LICENSE) and the notes in [`docs/`](docs/).
 ## Documentation
 
 - [`docs/README_vi.md`](docs/README_vi.md) — Vietnamese README.
+- We don't have full documentation or a wiki yet, so just temporarily use DeepWiki
 
 ## License
 
@@ -91,9 +92,9 @@ See [`LICENSE`](LICENSE).
 based on **UniKey**. UniKey is released under the GPL, so CatKey — as a
 derivative work — must also be GPL. (See the note in `LICENSE`.) This also
 means CatKey's source must always stay available; please keep builds
-reproducible and ship source alongside any binary you share.
+reproducible and ship the source alongside any binary you share.
 
-**Trust note:** because an input method sees everything you type, only run
+**Trust note:** Because an input method sees everything you type, only run
 builds you can verify from source. See the verification guidance above.
 
 **Modified versions (GPLv3 §7 additional terms):** if you distribute a
