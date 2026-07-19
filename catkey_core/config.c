@@ -16,12 +16,20 @@ void catkey_log_set_callback(catkey_log_func cb) {
 }
 
 void catkey_log(int level, const char *format, ...) {
-    if (level > catkey_log_level) {
+    if (level < catkey_log_level) {
         return;
     }
 
     const char *level_str[] = { "DEBUG", "INFO", "WARN", "ERROR" };
-    const char *prefix = level_str[level];
+    const char *prefix = (level >= 0 && level <= 3) ? level_str[level] : "UNKNOWN";
+
+    if (catkey_log_callback) {
+        va_list args;
+        va_start(args, format);
+        catkey_log_callback(level, format, args);
+        va_end(args);
+        return;
+    }
 
     fprintf(stderr, "[CATKEY][%s] ", prefix);
 

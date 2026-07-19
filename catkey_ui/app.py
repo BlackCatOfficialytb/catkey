@@ -521,7 +521,10 @@ class CatKeyApp:
     DBLCLICK_MS = 1000
 
     def __init__(self):
-        self.app = QApplication(sys.argv)
+        if QApplication.instance() is None:
+            self.app = QApplication(sys.argv)
+        else:
+            self.app = QApplication.instance()
         self.app.setQuitOnLastWindowClosed(False)
         self.app.setApplicationName(APP_NAME)
         self.app.setApplicationVersion(APP_VERSION)

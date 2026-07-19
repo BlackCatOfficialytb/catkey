@@ -7,16 +7,24 @@ of the C typing hook. The callback is invoked from the listener thread, so the
 consumer must marshal to the GUI thread (we use a Qt signal for that).
 """
 
-from pynput import keyboard
+try:
+    from pynput import keyboard
+    _PYNPUT_AVAILABLE = True
+except Exception:
+    keyboard = None
+    _PYNPUT_AVAILABLE = False
 
 
 # map config modifier names -> pynput keys (both left/right variants)
-_MOD_KEYS = {
-    "ctrl": {keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r},
-    "shift": {keyboard.Key.shift, keyboard.Key.shift_l, keyboard.Key.shift_r},
-    "alt": {keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r,
-            keyboard.Key.alt_gr},
-}
+if _PYNPUT_AVAILABLE and keyboard is not None:
+    _MOD_KEYS = {
+        "ctrl": {keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r},
+        "shift": {keyboard.Key.shift, keyboard.Key.shift_l, keyboard.Key.shift_r},
+        "alt": {keyboard.Key.alt, keyboard.Key.alt_l, keyboard.Key.alt_r,
+                keyboard.Key.alt_gr},
+    }
+else:
+    _MOD_KEYS = {}
 
 
 def _parse(combo: str):
@@ -54,16 +62,22 @@ class HotkeyListener:
         self._fired = False
 
     def start(self):
-        if self._listener:
+        if self._listener or not _PYNPUT_AVAILABLE or keyboard is None:
             return
-        self._listener = keyboard.Listener(
-            on_press=self._on_press, on_release=self._on_release)
-        self._listener.daemon = True
-        self._listener.start()
+        try:
+            self._listener = keyboard.Listener(
+                on_press=self._on_press, on_release=self._on_release)
+            self._listener.daemon = True
+            self._listener.start()
+        except Exception:
+            self._listener = None
 
     def stop(self):
         if self._listener:
-            self._listener.stop()
+            try:
+                self._listener.stop()
+            except Exception:
+                pass
             self._listener = None
 
     def _mod_name(self, key):
@@ -96,6 +110,13 @@ class HotkeyListener:
         name = self._mod_name(key)
         if name and name in self._pressed_mods:
             self._pressed_mods.discard(name)
+        elif self._letter is not None:
+            try:
+                if hasattr(key, "char") and key.char and key.char.lower() == self._letter:
+                    self._letter_ok = False
+                    self._fired = False
+            except Exception:
+                pass
         # reset latch once the combo is broken
         if not self._required.issubset(self._pressed_mods):
             self._fired = False

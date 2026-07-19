@@ -10,6 +10,14 @@
 PySide6-Essentials>=6.5
 pynput>=1.8
 
+# --- Test IME suite (needed to run test_ime.py) ---
+pyautogui
+requests
+
+# --- Unit tests (needed to run `python -m unittest discover -s tests`) ---
+# `--extra test`: install test dependencies (PySide6 already pulled in above).
+PySide6-Essentials>=6.5 ; extra == "test"
+
 # --- Nuitka ---
 # Base: Nuitka (basic packaging backend).
 Nuitka>=2.4

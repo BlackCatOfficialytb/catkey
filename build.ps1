@@ -110,7 +110,7 @@ if (-not (Test-Path $Dll)) {
                 $rel = [System.IO.Path]::GetRelativePath($CoreDir, $_) -replace '\\','/'
                 '"{0}"' -f $rel
             }) -join ' '
-            $cmd = "$cc -shared -O2 -o `"$Dll`" $relSrcs catkey_core.def -Wl,--kill-at -luser32"
+            $cmd = "$cc -shared -O2 -o `"$Dll`" catkey_core.def $relSrcs -Wl,--kill-at -luser32"
             & cmd /c $cmd 2>&1 | Write-Host
             if ($LASTEXITCODE -ne 0) { throw "MinGW ($Arch) build failed (exit $LASTEXITCODE)." }
         } finally {

@@ -159,7 +159,7 @@ typedef struct {
 
 static int emit_letters(Letter *ls, int n, char *out, int max) {
     int p = 0;
-    for (int i = 0; i < n && p < max - 4; i++) {
+    for (int i = 0; i < n; i++) {
         const char *s;
         char tmp[2];
         if (ls[i].is_dstroke) {
@@ -173,7 +173,7 @@ static int emit_letters(Letter *ls, int n, char *out, int max) {
             s = tmp;
         }
         int L = (int)strlen(s);
-        if (p + L >= max - 1) break;
+        if (p + L >= max) break;
         memcpy(out + p, s, L);
         p += L;
     }
@@ -203,15 +203,48 @@ static int tone_vowel_index(Letter *ls, int n) {
     int start = end;
     while (start - 1 >= 0 && ls[start - 1].is_vowel) start--;
 
-    for (int i = start; i <= end; i++)
+    /* Adjust start if qu- or gi- forms an initial consonant cluster with the first vowel */
+    if (start < end) {
+        if (ls[start].c == 'u' && start > 0 && ls[start - 1].c == 'q') {
+            start++;
+        } else if (ls[start].c == 'i' && start > 0 && ls[start - 1].c == 'g') {
+            start++;
+        }
+    }
+
+    if (start > end) {
+        start = end;
+    }
+
+    /* Any modified vowel (^, breve, horn) receives the tone */
+    for (int i = end; i >= start; i--)
         if (ls[i].variant != 0) return i;
 
     int count = end - start + 1;
     if (count == 1) return start;
 
+    /* Triphthongs / 3-vowel clusters (oai, oay, uai, uay, uye, etc.) */
+    if (count >= 3) {
+        /* uye / uyen / uyet: tone goes on e (3rd vowel) */
+        if (ls[start].c == 'u' && ls[start+1].c == 'y' && ls[start+2].c == 'e') {
+            return start + 2;
+        }
+        /* middle vowel for other triphthongs (oai, oay, uai, uay) */
+        return start + 1;
+    }
+
+    /* Diphthongs (2-vowel clusters) */
     int has_trailing_consonant = (end < n - 1);  /* consonant after cluster */
     if (has_trailing_consonant) return end;       /* closed: 2nd vowel */
-    return start;                                  /* open diphthong: 1st vowel */
+
+    /* Open diphthongs */
+    char c1 = ls[start].c;
+    char c2 = ls[end].c;
+    if ((c1 == 'o' && c2 == 'a') || (c1 == 'o' && c2 == 'e') || (c1 == 'u' && c2 == 'y')) {
+        return end; /* oa, oe, uy -> 2nd vowel */
+    }
+
+    return start;   /* default open diphthong: 1st vowel */
 }
 
 static int tone_from_telex(char c) {
@@ -237,6 +270,7 @@ static int convert_telex(const char *in, char *out, int max) {
         if (lc == 'd' && n > 0 && ls[n-1].c == 'd' && !ls[n-1].is_dstroke
             && !ls[n-1].is_vowel) {
             ls[n-1].is_dstroke = 1;
+            if (upper) ls[n-1].upper = 1;
             continue;
         }
 
@@ -244,6 +278,7 @@ static int convert_telex(const char *in, char *out, int max) {
         if (is_vowel(lc) && n > 0 && ls[n-1].is_vowel && ls[n-1].c == lc
             && ls[n-1].variant == 0 && (lc=='a'||lc=='e'||lc=='o')) {
             ls[n-1].variant = 1;
+            if (upper) ls[n-1].upper = 1;
             continue;
         }
 
@@ -252,12 +287,27 @@ static int convert_telex(const char *in, char *out, int max) {
             int vi = last_vowel_index(ls, n);
             if (vi >= 0) {
                 char b = ls[vi].c;
-                if (b=='a') { ls[vi].variant = 2; continue; }      /* ă */
-                if (b=='o') { ls[vi].variant = 2; continue; }      /* ơ */
-                if (b=='u') { ls[vi].variant = 2; continue; }      /* ư */
-                if (b=='e') { ls[vi].variant = 1; continue; }      /* (aw fallback) */
+                if (b == 'a') { ls[vi].variant = 2; continue; }      /* ă */
+                if (b == 'o') {
+                    ls[vi].variant = 2;                             /* ơ */
+                    if (vi > 0 && ls[vi-1].c == 'u') {
+                        ls[vi-1].variant = 2;                        /* uow -> ươ */
+                    }
+                    continue;
+                }
+                if (b == 'u') { ls[vi].variant = 2; continue; }      /* ư */
+                if (b == 'e') { ls[vi].variant = 1; continue; }      /* (aw fallback) */
+            } else {
+                /* Standalone w / initial w -> ư */
+                ls[n].c = 'u';
+                ls[n].is_vowel = 1;
+                ls[n].variant = 2;
+                ls[n].tone = T_NONE;
+                ls[n].is_dstroke = 0;
+                ls[n].upper = upper;
+                n++;
+                continue;
             }
-            /* standalone w -> could be uw; just drop as literal 'w' */
         }
 
         /* tone marks */
@@ -319,14 +369,24 @@ static int convert_vni(const char *in, char *out, int max) {
         }
         if (lc == '7') { /* horn o/u */
             int vi = last_vowel_index(ls, n);
-            if (vi >= 0 && (ls[vi].c=='o'||ls[vi].c=='u')) { ls[vi].variant = 2; continue; }
+            if (vi >= 0 && (ls[vi].c=='o'||ls[vi].c=='u')) {
+                ls[vi].variant = 2;
+                if (ls[vi].c == 'o' && vi > 0 && ls[vi-1].c == 'u') {
+                    ls[vi-1].variant = 2; /* uo7 -> ươ */
+                }
+                continue;
+            }
         }
         if (lc == '8') { /* breve a */
             int vi = last_vowel_index(ls, n);
             if (vi >= 0 && ls[vi].c=='a') { ls[vi].variant = 2; continue; }
         }
         if (lc == '9') { /* d -> đ */
-            for (int i = n-1; i >= 0; i--) if (ls[i].c=='d' && !ls[i].is_vowel) { ls[i].is_dstroke = 1; break; }
+            for (int i = n-1; i >= 0; i--) if (ls[i].c=='d' && !ls[i].is_vowel) {
+                ls[i].is_dstroke = 1;
+                if (upper) ls[i].upper = 1;
+                break;
+            }
             continue;
         }
         if (lc == '0') continue; /* remove tone marker (ignored) */
@@ -436,11 +496,51 @@ int catkey_modifier_pressed(int vk_code) { (void)vk_code; return 0; }
 
 #ifdef CATKEY_TEST
 #include <stdio.h>
+#include <assert.h>
+
 int main(void) {
-    const char *tests[] = {"dd","aa","chaof","vieejt","tieengs","ddaa","as","af",
-                           "Ee","Aa","Ow","Uwx","DDaay","TIEENGS"};
-    char o[MAX_OUTPUT_LENGTH];
-    for (int i=0;i<14;i++){ catkey_convert_word(tests[i],o,sizeof o,CATKEY_TEIP); printf("%s -> %s\n",tests[i],o);}    
+    struct { const char *in; const char *out; int method; } tests[] = {
+        {"dd", "đ", CATKEY_TEIP},
+        {"DD", "Đ", CATKEY_TEIP},
+        {"Dd", "Đ", CATKEY_TEIP},
+        {"dD", "Đ", CATKEY_TEIP},
+        {"aa", "â", CATKEY_TEIP},
+        {"chaof", "chào", CATKEY_TEIP},
+        {"vieejt", "việt", CATKEY_TEIP},
+        {"tieengs", "tiếng", CATKEY_TEIP},
+        {"quas", "quá", CATKEY_TEIP},
+        {"gias", "giá", CATKEY_TEIP},
+        {"uow", "ươ", CATKEY_TEIP},
+        {"w", "ư", CATKEY_TEIP},
+        {"wn", "ưn", CATKEY_TEIP},
+        {"d9", "đ", CATKEY_VNI},
+        {"a6", "â", CATKEY_VNI},
+        {"a8", "ă", CATKEY_VNI},
+        {"uo7", "ươ", CATKEY_VNI},
+        {"vie65t", "việt", CATKEY_VNI},
+        {"tie61ng", "tiếng", CATKEY_VNI},
+        {"dd", "đ", CATKEY_VIQR},
+        {"vie^'t", "viết", CATKEY_VIQR},
+        {"nu+o+'c", "nước", CATKEY_VIQR},
+        {"ngu+o+`i", "người", CATKEY_VIQR},
+    };
+    char buf[MAX_OUTPUT_LENGTH];
+    int failed = 0;
+    int n = (int)(sizeof(tests) / sizeof(tests[0]));
+    for (int i = 0; i < n; i++) {
+        catkey_convert_word(tests[i].in, buf, sizeof(buf), tests[i].method);
+        if (strcmp(buf, tests[i].out) != 0) {
+            printf("FAIL: %s -> %s (expected %s)\n", tests[i].in, buf, tests[i].out);
+            failed++;
+        } else {
+            printf("PASS: %s -> %s\n", tests[i].in, buf);
+        }
+    }
+    if (failed > 0) {
+        printf("%d tests failed!\n", failed);
+        return 1;
+    }
+    printf("All %d unit tests passed successfully!\n", n);
     return 0;
 }
 #endif

@@ -20,11 +20,13 @@ dist/
 *.o
 *.exp
 *.lib
+*.a
 *.dll
 *.so
 *.dylib
 *.pdb
 *.ilk
+test_runner*
 
 # gettext compiled catalogs (regenerated from .po)
 *.mo
