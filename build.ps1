@@ -91,25 +91,28 @@ if (-not (Test-Path $Dll)) {
         cmd /c $cmd | Out-Null
         if (-not (Test-Path $Dll)) { throw "MSVC build failed." }
     } else {
-        # MinGW (MSYS2): select the toolchain matching the target arch.
-        $envs = @{
-            x64    = 'mingw64'
-            x86    = 'mingw32'
-            arm64  = 'clangarm64'
-        }
-        $msys = "C:\msys64\msys2_shell.cmd"
-        if (-not (Test-Path $msys)) { throw "MSYS2 not found at $msys." }
-        # NOTE: PowerShell variables are case-insensitive, so we must NOT name
-        # this $tool (it would clobber the -$Tool parameter). Use $cc.
+        # MinGW (MSYS2): the setup-msys2 action has already put the matching
+        # toolchain (gcc/clang) on PATH and set MSYSTEM. Call the compiler
+        # directly - no msys2_shell.cmd indirection (which is async + fragile).
         $cc = if ($Arch -eq 'arm64') { 'clang' } else { 'gcc' }
+        if (-not (Get-Command $cc -ErrorAction SilentlyContinue)) {
+            throw "$cc not found on PATH (install MSYS2 + the matching toolchain first)."
+        }
         # MinGW needs the .def as a plain input file to export symbols
         # (functions in vietnamese_tep.c are not __declspec(dllexport)).
-        # cd into the core dir so the relative .def path resolves.
-        $relSrcs = ($srcs | ForEach-Object { '"{0}"' -f (Split-Path $_ -Leaf) }) -join ' '
-        $cmd = ('C:\msys64\msys2_shell.cmd -{0} -defterm -no-start -here -c ' +
-                '"cd \"{1}\" && {2} -shared -O2 -o \"{3}\" {4} catkey_core.def -Wl,--kill-at -luser32"' `
-                -f $envs[$Arch], $CoreDir, $cc, $Dll, $relSrcs)
-        cmd /c $cmd | Out-Null
+        # Run from the core dir so the relative .def / source paths resolve.
+        Push-Location $CoreDir
+        try {
+            $relSrcs = ($srcs | ForEach-Object {
+                $rel = [System.IO.Path]::GetRelativePath($CoreDir, $_) -replace '\\','/'
+                '"{0}"' -f $rel
+            }) -join ' '
+            $cmd = "$cc -shared -O2 -o `"$Dll`" $relSrcs catkey_core.def -Wl,--kill-at -luser32"
+            & cmd /c $cmd 2>&1 | Write-Host
+            if ($LASTEXITCODE -ne 0) { throw "MinGW ($Arch) build failed (exit $LASTEXITCODE)." }
+        } finally {
+            Pop-Location
+        }
         if (-not (Test-Path $Dll)) { throw "MinGW ($Arch) build failed." }
     }
     Write-Host "core built: $Dll" -ForegroundColor Green
