@@ -201,6 +201,9 @@ class MainWindow(QMainWindow):
 
         spell_box = self._track(QGroupBox(), "Spelling", "setTitle")
         sb = QVBoxLayout(spell_box)
+        lbl_sp = QLabel(_("Spelling checks are not wired yet (alpha)."))
+        lbl_sp.setStyleSheet("color:#888; font-style:italic;")
+        sb.addWidget(lbl_sp)
         sb.addWidget(self._chk("check_spelling", "Check basic spelling"))
         sb.addWidget(self._chk("auto_restore_wrong_spelling",
                                "Change back to original word on spelling mistake"))
@@ -220,6 +223,9 @@ class MainWindow(QMainWindow):
 
         compat = self._track(QGroupBox(), "Compatibility", "setTitle")
         cb = QVBoxLayout(compat)
+        lbl_co = QLabel(_("Compatibility options are not wired yet (alpha)."))
+        lbl_co.setStyleSheet("color:#888; font-style:italic;")
+        cb.addWidget(lbl_co)
         cb.addWidget(self._chk("modern_style", "Modern style"))
         cb.addWidget(self._chk("standard_key_sending", "Use standard key sending"))
         cb.addWidget(self._chk("use_clipboard_send", "Use Clipboard for send key"))
@@ -239,6 +245,9 @@ class MainWindow(QMainWindow):
                                "Notify when Vietnamese typing is turned on or off"))
         yb.addWidget(self._chk("auto_check_update", "Auto check for update at boot time"))
         yb.addWidget(self._chk("customize_tray_icon", "Customize Tray icon"))
+        lbl_sy = QLabel(_("Auto-run / Auto-update / Dialog at startup are not wired yet (alpha)."))
+        lbl_sy.setStyleSheet("color:#888; font-style:italic;")
+        yb.addWidget(lbl_sy)
         lay.addWidget(system)
         lay.addStretch()
         return w
@@ -246,6 +255,9 @@ class MainWindow(QMainWindow):
     def _tab_shortkeys(self) -> QWidget:
         w = QWidget()
         form = QFormLayout(w)
+        lbl_sk = QLabel(_("Restore/Reset shortkeys are not wired yet (alpha). Switch works via pynput."))
+        lbl_sk.setStyleSheet("color:#888; font-style:italic;")
+        form.addRow(lbl_sk)
         self.key_switch = QKeySequenceEdit()
         self.key_restore = QKeySequenceEdit()
         self.key_reset = QKeySequenceEdit()
@@ -257,6 +269,9 @@ class MainWindow(QMainWindow):
     def _tab_macro(self) -> QWidget:
         w = QWidget()
         lay = QVBoxLayout(w)
+        lbl_ma = QLabel(_("Macros are not wired yet (alpha)."))
+        lbl_ma.setStyleSheet("color:#888; font-style:italic;")
+        lay.addWidget(lbl_ma)
         lay.addWidget(self._chk("macro_enabled", "Enable macros"))
         lay.addWidget(self._chk("macro_even_if_off",
                                 "Allow macros even if Vietnamese is off"))

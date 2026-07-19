@@ -14,17 +14,19 @@ import sys
 from pathlib import Path
 
 APP_NAME = "CatKey"
-APP_VERSION = "1.0.0"
+APP_VERSION = "0.0.1.0a"
 
 # --- Input methods (EVKey parity) ---------------------------------------
+# Only "Telex" and "VNI Windows" have a working conversion engine.
+# The rest are UI-only; "(no conv.)" means the C core does not convert them yet.
 INPUT_METHODS = [
     "Telex",
     "VNI Windows",
-    "Simple Telex",
-    "Simple Telex 2",
-    "Telex + VNI",
-    "VIQR",
-    "Microsoft VI Layout",
+    "Simple Telex (no conv.)",
+    "Simple Telex 2 (no conv.)",
+    "Telex + VNI (no conv.)",
+    "VIQR (no conv.)",
+    "Microsoft VI Layout (no conv.)",
 ]
 
 # --- Character encodings (EVKey parity) ---------------------------------

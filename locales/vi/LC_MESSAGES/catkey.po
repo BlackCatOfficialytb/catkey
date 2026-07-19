@@ -193,3 +193,22 @@ msgstr "Đã TẮT gõ Tiếng Việt"
 
 msgid "Notify when Vietnamese typing is turned on or off"
 msgstr "Thông báo khi bật/tắt gõ Tiếng Việt"
+#: catkey_ui/app.py
+msgid "Spelling checks are not wired yet (alpha)."
+msgstr "Tính năng kiểm tra chính tả chưa có (alpha)."
+
+#: catkey_ui/app.py
+msgid "Compatibility options are not wired yet (alpha)."
+msgstr "Tùy chọn tương thích chưa có (alpha)."
+
+#: catkey_ui/app.py
+msgid "Restore/Reset shortkeys are not wired yet (alpha). Switch works via pynput."
+msgstr "Phím tắt khôi phục/đặt lại chưa có (alpha). Phím chuyển đổi hoạt động qua pynput."
+
+#: catkey_ui/app.py
+msgid "Macros are not wired yet (alpha)."
+msgstr "Macro chưa có (alpha)."
+
+#: catkey_ui/app.py
+msgid "Auto-run / Auto-update / Dialog at startup are not wired yet (alpha)."
+msgstr "Tự động chạy / cập nhật / hiện hộp thoại khi khởi động chưa có (alpha)."
