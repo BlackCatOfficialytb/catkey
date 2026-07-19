@@ -1,5 +1,7 @@
 # CatKey
 
+[![Build](https://github.com/BlackCatOfficialytb/catkey/actions/workflows/build.yml/badge.svg)](https://github.com/BlackCatOfficialytb/catkey/actions/workflows/build.yml)
+
 A free, open-source Vietnamese input method (bộ gõ tiếng Việt) with an
 EVKey-style interface.
 
