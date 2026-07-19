@@ -65,6 +65,9 @@ function Remove-Artifacts {
         $p = Join-Path $Root $d
         if (Test-Path $p) { Remove-Item -Recurse -Force $p }
     }
+    # Also remove suffixed output dirs from previous arch/compiler builds.
+    Get-ChildItem $Root -Directory -Filter "$Name-*" -ErrorAction SilentlyContinue |
+        ForEach-Object { Remove-Item -Recurse -Force $_.FullName }
     Get-ChildItem $Root -Filter '*.spec' | Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
@@ -162,6 +165,21 @@ else {
     $mode = $OneFile ? '--onefile' : '--standalone'
     # Cross-arch: tell Nuitka the target. Native (x64 on x64) needs nothing.
     $narch = if ($Arch -eq 'x64') { @() } else { "--target-arch=$Arch" }
+    $outDir = Join-Path $Root "dist\$Name-$Suffix"
+    # Onefile linker can fail with LNK1104 when the output-dir was just
+    # written to by the internal standalone step.  Use a temp dir for the
+    # build, then move the final exe to the expected dist/ location.
+    if ($OneFile) {
+        $tempDir = Join-Path $env:TEMP "catkey_nk_onefile_$(Get-Random)"
+        if (Test-Path $tempDir) { Remove-Item -Recurse -Force $tempDir }
+        New-Item -ItemType Directory -Path $tempDir | Out-Null
+        # Try to exclude the temp dir from Windows Defender / BitDefender so
+        # Nuitka's post-processing (PE resource embedding) isn't blocked.
+        try { Add-MpExclusion -ExclusionPath $tempDir -ErrorAction Stop } catch {}
+        $buildDir = $tempDir
+    } else {
+        $buildDir = $outDir
+    }
     $args = @(
         '-m', 'nuitka', $mode,
         '--enable-plugin=pyside6',
@@ -169,7 +187,7 @@ else {
         "--output-filename=$Name.exe",
         "--include-data-dir=$Locales=locales",
         '--assume-yes-for-downloads',
-        "--output-dir=$(Join-Path $Root "dist\$Name-$Suffix")"
+        "--output-dir=$buildDir"
     ) + $narch
     # Nuitka's --include-data-dir skips *.dll; force each native lib in as a
     # data file so ctypes can load it at runtime (no compiler on user's box).
@@ -178,7 +196,22 @@ else {
     }
     $args += $Entry
     & $Python @args
-    $out = $OneFile ? (Join-Path $Root "dist\$Name-$Suffix\$Name.exe") : (Join-Path $Root "dist\$Name-$Suffix\run_ui.dist\$Name.exe")
+    if ($OneFile) {
+        $built = Join-Path $tempDir "$Name.exe"
+        $final = Join-Path $outDir "$Name-$Suffix.exe"
+        if (Test-Path $built) {
+            if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir | Out-Null }
+            # Defender may still hold the file briefly after Nuitka finishes.
+            for ($i = 0; $i -lt 5; $i++) {
+                try { Move-Item -Force $built $final -ErrorAction Stop; break }
+                catch { Start-Sleep -Seconds 2 }
+            }
+        }
+        Remove-Item -Recurse -Force $tempDir -ErrorAction SilentlyContinue
+        $out = $final
+    } else {
+        $out = Join-Path $outDir "run_ui.dist\$Name.exe"
+    }
 }
 
 if (Test-Path $out) {
