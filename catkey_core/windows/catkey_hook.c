@@ -28,6 +28,7 @@ int catkey_convert_word(const char *word, char *output, int max_len, int method)
 
 #define CATKEY_TELEX 1
 #define CATKEY_VNI   2
+#define CATKEY_VIQR  3
 #define BUF_MAX      48
 
 static HHOOK   g_hook = NULL;
@@ -122,7 +123,7 @@ static int recompute_and_apply(void) {
     g_raw[g_raw_len] = 0;
 
     char utf8[BUF_MAX * 4];
-    int m = (g_method == CATKEY_VNI) ? CATKEY_VNI : CATKEY_TELEX;
+    int m = (int)InterlockedOr(&g_method, 0);
     int n = catkey_convert_word(g_raw, utf8, sizeof(utf8), m);
     if (n <= 0) { strcpy(utf8, g_raw); }
 
@@ -150,8 +151,6 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
 
     KBDLLHOOKSTRUCT *kb = (KBDLLHOOKSTRUCT *)lParam;
-    if (kb->flags & LLKHF_INJECTED)
-        return CallNextHookEx(g_hook, nCode, wParam, lParam);
 
     DWORD vk = kb->vkCode;
     SHORT ctrl = GetAsyncKeyState(VK_CONTROL) & 0x8000;
@@ -236,6 +235,29 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
      * Letter case = Shift XOR CapsLock (CapsLock only affects letters). */
     char ch = 0;
     int caps = (GetKeyState(VK_CAPITAL) & 1) ? 1 : 0;
+
+    /* VIQR mode: buffer diacritic punctuation instead of committing.
+     * Must be checked BEFORE the digit-with-shift path since Shift+6 (^),
+     * Shift+9 ((), etc. are shifted digits. */
+    if ((int)InterlockedOr(&g_method, 0) == CATKEY_VIQR) {
+        char viqr_ch = 0;
+        if      (vk == 0xDE && !shift) viqr_ch = '\'';  /* ' sac */
+        else if (vk == 0xC0 && !shift) viqr_ch = '`';   /* ` huyen */
+        else if (vk == 0xBF &&  shift) viqr_ch = '?';   /* ? hoi  */
+        else if (vk == 0xC0 &&  shift) viqr_ch = '~';   /* ~ nga  */
+        else if (vk == 0xBE && !shift) viqr_ch = '.';   /* . nang */
+        else if (vk == '6'  &&  shift) viqr_ch = '^';   /* ^ circumflex */
+        else if (vk == '9'  &&  shift) viqr_ch = '(';   /* ( breve */
+        else if (vk == 0xBB &&  shift) viqr_ch = '+';   /* + horn */
+        if (viqr_ch) {
+            if (g_raw_len >= BUF_MAX - 1) reset_word();
+            g_raw[g_raw_len++] = viqr_ch;
+            if (recompute_and_apply())
+                return 1;
+            return CallNextHookEx(g_hook, nCode, wParam, lParam);
+        }
+    }
+
     if (vk >= 'A' && vk <= 'Z') {
         int upper = (shift ? 1 : 0) ^ caps;
         ch = (char)(upper ? vk : (vk | 0x20));
@@ -250,13 +272,6 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
     }
 
     if (g_raw_len >= BUF_MAX - 1) reset_word();
-
-    /* If the previous word was already converted (diacritic applied), the next
-     * letter starts a new word. Prevents bug where "tô" + "o" draws "tôo"
-     * instead of resetting and drawing "too". */
-    if (g_was_converted) {
-        reset_word();
-    }
 
     /* Add the raw key and convert. If the conversion is unchanged we let the
      * original key pass through (avoids doubling). If a diacritic applied we
@@ -310,7 +325,10 @@ __declspec(dllexport) int catkey_get_enabled(void) {
 }
 
 __declspec(dllexport) void catkey_set_method(int method) {
-    InterlockedExchange(&g_method, method == CATKEY_VNI ? CATKEY_VNI : CATKEY_TELEX);
+    if (method == CATKEY_VNI || method == CATKEY_VIQR)
+        InterlockedExchange(&g_method, method);
+    else
+        InterlockedExchange(&g_method, CATKEY_TELEX);
     reset_word();
 }
 

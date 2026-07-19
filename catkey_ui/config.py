@@ -25,7 +25,7 @@ INPUT_METHODS = [
     "Simple Telex (no conv.)",
     "Simple Telex 2 (no conv.)",
     "Telex + VNI (no conv.)",
-    "VIQR (no conv.)",
+    "VIQR",
     "Microsoft VI Layout (no conv.)",
     "User defined (no conv.)",
 ]
@@ -81,6 +81,7 @@ METHODS = [
 
 MODE_TEIP = "teip"
 MODE_VNI = "vni"
+MODE_VIQR = "viqr"
 
 DEFAULT_CONFIG = {
     # UI language: "en" or "vi" (interface language, not the typing engine)

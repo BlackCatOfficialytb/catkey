@@ -44,6 +44,7 @@ from .config import (
     METHODS,
     MODE_TEIP,
     MODE_VNI,
+    MODE_VIQR,
     load_config,
     save_config,
     get_platform,
@@ -426,7 +427,12 @@ class MainWindow(QMainWindow):
     # -- Preview (C core) -------------------------------------------------
 
     def _engine_mode(self) -> str:
-        return MODE_VNI if "VNI" in self.cmb_method.currentText() else MODE_TEIP
+        name = self.cmb_method.currentText()
+        if "VNI" in name:
+            return MODE_VNI
+        if "VIQR" in name:
+            return MODE_VIQR
+        return MODE_TEIP
 
     def _update_preview(self, *args):
         if not hasattr(self, "preview_input"):
@@ -578,7 +584,13 @@ class CatKeyApp:
         """Sync the C hook engine with current config (enabled + method)."""
         if not hook_available():
             return
-        method = "vni" if "VNI" in self.config.get("input_method", "") else "teip"
+        im = self.config.get("input_method", "")
+        if "VNI" in im:
+            method = MODE_VNI
+        elif "VIQR" in im:
+            method = MODE_VIQR
+        else:
+            method = MODE_TEIP
         hook_set_method(method)
         hook_set_enabled(bool(self.config.get("vietnamese_on", True)))
 

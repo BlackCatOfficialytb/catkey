@@ -17,6 +17,7 @@
 
 #define CATKEY_TEIP 1
 #define CATKEY_VNI 2
+#define CATKEY_VIQR 3
 #define MAX_OUTPUT_LENGTH 64
 
 /* Tone indices */
@@ -341,11 +342,82 @@ static int convert_vni(const char *in, char *out, int max) {
     return emit_letters(ls, n, out, max);
 }
 
+/*
+ * VIQR conversion.
+ *
+ * VIQR uses ASCII punctuation as diacritic markers:
+ *   ^ circumflex, ( breve, + horn (modifiers)
+ *   ' sac, ` huyen, ? hoi, ~ nga, . nang (tones)
+ *   dd -> d-stroke
+ *
+ * Each marker applies to the last vowel in the buffer (if legal).
+ * Non-marker characters pass through unchanged.
+ */
+static int convert_viqr(const char *in, char *out, int max) {
+    Letter ls[64];
+    int n = 0;
+    for (const char *p = in; *p && n < 63; p++) {
+        char c = *p;
+
+        /* Modifier characters: apply to last vowel */
+        if (c == '^' || c == '(' || c == '+') {
+            int vi = last_vowel_index(ls, n);
+            if (vi >= 0) {
+                char b = ls[vi].c;
+                if (c == '^' && (b=='a'||b=='e'||b=='o')) {
+                    ls[vi].variant = 1; continue;
+                }
+                if (c == '(' && b == 'a') {
+                    ls[vi].variant = 2; continue;
+                }
+                if (c == '+' && (b=='o'||b=='u')) {
+                    ls[vi].variant = 2; continue;
+                }
+            }
+            /* Illegal combination: treat as literal character */
+            ls[n].c = c;
+            ls[n].is_vowel = 0;
+            ls[n].variant = 0;
+            ls[n].tone = T_NONE;
+            ls[n].is_dstroke = 0;
+            ls[n].upper = 0;
+            n++;
+            continue;
+        }
+
+        /* Tone characters: apply to last vowel */
+        if (c == '\'') { int vi = last_vowel_index(ls, n); if (vi >= 0) { ls[vi].tone = T_SAC; continue; } }
+        if (c == '`')  { int vi = last_vowel_index(ls, n); if (vi >= 0) { ls[vi].tone = T_HUYEN; continue; } }
+        if (c == '?')  { int vi = last_vowel_index(ls, n); if (vi >= 0) { ls[vi].tone = T_HOI; continue; } }
+        if (c == '~')  { int vi = last_vowel_index(ls, n); if (vi >= 0) { ls[vi].tone = T_NGA; continue; } }
+        if (c == '.')  { int vi = last_vowel_index(ls, n); if (vi >= 0) { ls[vi].tone = T_NANG; continue; } }
+
+        /* dd -> d-stroke */
+        char lc = (char)tolower((unsigned char)c);
+        if (lc == 'd' && n > 0 && ls[n-1].c == 'd' && !ls[n-1].is_dstroke
+            && !ls[n-1].is_vowel) {
+            ls[n-1].is_dstroke = 1;
+            continue;
+        }
+
+        /* Normal letter */
+        ls[n].c = lc;
+        ls[n].is_vowel = is_vowel(lc);
+        ls[n].variant = 0;
+        ls[n].tone = T_NONE;
+        ls[n].is_dstroke = 0;
+        ls[n].upper = isupper((unsigned char)c) ? 1 : 0;
+        n++;
+    }
+    return emit_letters(ls, n, out, max);
+}
+
 /* ---- Public API (unchanged signatures) -------------------------------- */
 
 int catkey_convert_word(const char *word, char *output, int max_len, int method) {
     if (!word || !output || max_len < 1) return 0;
-    if (method == CATKEY_VNI) return convert_vni(word, output, max_len);
+    if (method == CATKEY_VNI)  return convert_vni(word, output, max_len);
+    if (method == CATKEY_VIQR) return convert_viqr(word, output, max_len);
     return convert_telex(word, output, max_len);
 }
 

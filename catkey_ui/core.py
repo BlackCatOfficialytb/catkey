@@ -15,6 +15,7 @@ from pathlib import Path
 _METHOD_RAW = 0
 _METHOD_TEIP = 1
 _METHOD_VNI = 2
+_METHOD_VIQR = 3
 _MAX_OUTPUT = 128
 
 def _data_root() -> Path:
@@ -149,10 +150,10 @@ def core_available() -> bool:
 
 
 def convert_word(word: str, method: str) -> str:
-    """Convert a word via the C core. method is 'teip' or 'vni'."""
+    """Convert a word via the C core. method is 'teip', 'vni', or 'viqr'."""
     if _LIB is None:
         return word
-    m = _METHOD_VNI if method == "vni" else _METHOD_TEIP
+    m = {'vni': _METHOD_VNI, 'viqr': _METHOD_VIQR}.get(method, _METHOD_TEIP)
     buf = ctypes.create_string_buffer(_MAX_OUTPUT)
     n = _LIB.catkey_convert_word(word.encode("utf-8"), buf, _MAX_OUTPUT, m)
     if n <= 0:
@@ -185,7 +186,8 @@ def hook_set_enabled(on: bool) -> None:
 
 def hook_set_method(method: str) -> None:
     if hook_available():
-        _LIB.catkey_set_method(_METHOD_VNI if method == "vni" else _METHOD_TEIP)
+        m = {'vni': _METHOD_VNI, 'viqr': _METHOD_VIQR}.get(method, _METHOD_TEIP)
+        _LIB.catkey_set_method(m)
 
 
 def hook_is_running() -> bool:
