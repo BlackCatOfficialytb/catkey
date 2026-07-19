@@ -153,9 +153,9 @@ elif [ "$TOOL" = "nuitka" ]; then
         --include-data-dir="$LOCALES=locales" \
         "${NUITKA_LIBS[@]}" \
         --assume-yes-for-downloads \
-        --output-dir="$ROOT/dist/$SUFFIX" \
+        --output-dir="$ROOT/dist/$NAME-$SUFFIX" \
         "$ENTRY"
-    if [ "$ONEFILE" -eq 1 ]; then OUT="$ROOT/dist/$SUFFIX/$NAME"; else OUT="$ROOT/dist/$SUFFIX/run_ui.dist/$NAME"; fi
+    if [ "$ONEFILE" -eq 1 ]; then OUT="$ROOT/dist/$NAME-$SUFFIX/$NAME"; else OUT="$ROOT/dist/$NAME-$SUFFIX/run_ui.dist/$NAME"; fi
 else
     echo "Unknown tool: $TOOL (use pyinstaller or nuitka)" >&2; exit 1
 fi

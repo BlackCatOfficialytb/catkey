@@ -169,7 +169,7 @@ else {
         "--output-filename=$Name.exe",
         "--include-data-dir=$Locales=locales",
         '--assume-yes-for-downloads',
-        "--output-dir=$(Join-Path $Root 'dist' $Suffix)"
+        "--output-dir=$(Join-Path $Root "dist\$Name-$Suffix")"
     ) + $narch
     # Nuitka's --include-data-dir skips *.dll; force each native lib in as a
     # data file so ctypes can load it at runtime (no compiler on user's box).
@@ -178,7 +178,7 @@ else {
     }
     $args += $Entry
     & $Python @args
-    $out = $OneFile ? (Join-Path $Root "dist\$Suffix\$Name.exe") : (Join-Path $Root "dist\$Suffix\run_ui.dist\$Name.exe")
+    $out = $OneFile ? (Join-Path $Root "dist\$Name-$Suffix\$Name.exe") : (Join-Path $Root "dist\$Name-$Suffix\run_ui.dist\$Name.exe")
 }
 
 if (Test-Path $out) {
