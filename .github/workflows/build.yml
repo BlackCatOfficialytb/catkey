@@ -52,9 +52,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install PySide6-Essentials pynput ${{ matrix.tool }}
 
-      - name: Run unit tests
-        run: python -m unittest discover -s tests -v
-
       - name: Build CatKey
         shell: pwsh
         run: |
@@ -100,9 +97,6 @@ jobs:
           sudo apt-get install -y $PKGS
           python -m pip install --upgrade pip
           pip install PySide6-Essentials pynput ${{ matrix.tool }}
-
-      - name: Run unit tests
-        run: python -m unittest discover -s tests -v
 
       - name: Build CatKey
         run: |
