@@ -27,6 +27,7 @@ INPUT_METHODS = [
     "Telex + VNI (no conv.)",
     "VIQR (no conv.)",
     "Microsoft VI Layout (no conv.)",
+    "User defined (no conv.)",
 ]
 
 # --- Character encodings (EVKey parity) ---------------------------------
