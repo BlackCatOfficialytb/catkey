@@ -1,0 +1,91 @@
+# Maintainer: BlackCatOfficial <quanvm0501alt1@tutamail.com>
+pkgbase=catkey-git
+pkgname=('catkey-git-pyinstaller' 'catkey-git-nuitka')
+_pkgname=catkey
+pkgver=r1.09ca870
+pkgrel=1
+pkgdesc="Free, open-source Vietnamese input method (Telex/VNI, EVKey-style UI)"
+arch=('x86_64')
+url="https://github.com/blackcatofficialytb/catkey"
+license=('GPL-3.0-or-later')
+makedepends=('git' 'gcc' 'patchelf' 'python' 'python-pip'
+             'python-pyinstaller' 'nuitka' 'ccache')
+options=('!strip')
+validpgpkeys=('3BCD0065B62DABC43F7BBC4243CAF18107EC56BB')
+source=("git+https://github.com/blackcatofficialytb/catkey.git")
+sha256sums=('SKIP')
+
+pkgver() {
+    cd "$_pkgname"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+    cd "$_pkgname"
+
+    # Use --global-install so build.sh relies on the repo makedepends
+    # (python-pyside6, python-pynput, python-pyinstaller, nuitka) instead of
+    # fetching from PyPI into a .venv during build().
+    #
+    # build.sh wipes dist/ at the start of every run, so stash each
+    # variant's output before building the next one.
+    ./build.sh --tool pyinstaller --arch x64 --compiler gcc --global-install
+    rm -rf "$srcdir/out-pyinstaller"
+    # PyInstaller onedir: dist/CatKey-x64-gcc/ is the bundle, the binary
+    # inside it is named CatKey-x64-gcc.
+    cp -a "dist/CatKey-x64-gcc" "$srcdir/out-pyinstaller"
+
+    ./build.sh --tool nuitka --arch x64 --compiler gcc --global-install
+    rm -rf "$srcdir/out-nuitka"
+    cp -a "dist/CatKey-x64-gcc/run_ui.dist" "$srcdir/out-nuitka"
+}
+
+_install_common() {
+    install -Dm644 "$srcdir/$_pkgname/LICENSE" \
+        "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 "$srcdir/$_pkgname/README.md" \
+        "$pkgdir/usr/share/doc/$pkgname/README.md"
+
+    install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/catkey.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=CatKey
+Comment=Vietnamese input method (Telex/VNI)
+Exec=catkey
+Terminal=false
+Categories=Utility;
+Keywords=vietnamese;ime;telex;vni;input;
+EOF
+}
+
+package_catkey-git-pyinstaller() {
+    pkgdesc="$pkgdesc - PyInstaller build"
+    depends=('python' 'python-pyside6' 'python-pynput' 'libx11' 'ncurses')
+    provides=('catkey')
+    conflicts=('catkey' 'catkey-git-nuitka')
+
+    install -d "$pkgdir/opt/$_pkgname"
+    cp -a "$srcdir/out-pyinstaller/." "$pkgdir/opt/$_pkgname/"
+
+    install -d "$pkgdir/usr/bin"
+    ln -s "/opt/$_pkgname/CatKey-x64-gcc" "$pkgdir/usr/bin/catkey"
+
+    _install_common
+}
+
+# ---
+
+package_catkey-git-nuitka() {
+    pkgdesc="$pkgdesc - Nuitka build"
+    depends=('python' 'python-pyside6' 'python-pynput' 'libx11' 'ncurses')
+    provides=('catkey')
+    conflicts=('catkey' 'catkey-git-pyinstaller')
+
+    install -d "$pkgdir/opt/$_pkgname"
+    cp -a "$srcdir/out-nuitka/." "$pkgdir/opt/$_pkgname/"
+
+    install -d "$pkgdir/usr/bin"
+    ln -s "/opt/$_pkgname/CatKey" "$pkgdir/usr/bin/catkey"
+
+    _install_common
+}
