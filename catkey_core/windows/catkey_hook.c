@@ -29,6 +29,7 @@ int catkey_convert_word(const char *word, char *output, int max_len, int method)
 #define CATKEY_TELEX 1
 #define CATKEY_VNI   2
 #define CATKEY_VIQR  3
+#define CATKEY_TEIP_VNI 4
 #define BUF_MAX      48
 
 static HHOOK   g_hook = NULL;
@@ -44,6 +45,10 @@ static volatile LONG g_toggle_vk   = 0;
 static volatile LONG g_toggle_mods = 1 | 2;   /* Ctrl+Shift */
 static volatile LONG g_toggled_state = 1;     /* mirrors g_enabled for polling */
 static int g_combo_latch = 0;                 /* prevents repeat while held */
+
+/* Restore hotkey: re-type the original (un-converted) word. vk=0 disables. */
+static volatile LONG g_restore_vk   = 0;
+static volatile LONG g_restore_mods = 1 | 2;  /* Ctrl+Shift by default */
 
 /* Current word buffer: the raw keys the user typed (ASCII), plus the number
  * of on-screen characters we last produced (so we know how many to delete). */
@@ -203,6 +208,25 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
         }
     }
 
+    /* --- Restore hotkey: re-type the original (un-converted) word --- */
+    LONG rvk = InterlockedOr(&g_restore_vk, 0);
+    if (rvk != 0 && is_down && g_raw_len > 0) {
+        LONG rmods = InterlockedOr(&g_restore_mods, 0);
+        int rmods_ok = ((rmods & 1) ? ctrl  : 1) &&
+                       ((rmods & 2) ? shift : 1) &&
+                       ((rmods & 4) ? alt   : 1);
+        if (rmods_ok && vk == (DWORD)rvk) {
+            /* Delete the converted word on screen, then type the raw ASCII. */
+            wchar_t raw_w[BUF_MAX * 4];
+            int ru = MultiByteToWideChar(CP_UTF8, 0, g_raw, g_raw_len, raw_w,
+                                         BUF_MAX * 4 - 1);
+            raw_w[ru] = 0;
+            rewrite(g_shown_units, raw_w);
+            reset_word();
+            return 1; /* swallow the hotkey key */
+        }
+    }
+
     /* If disabled, do nothing further (pass everything through). */
     if (!InterlockedOr(&g_enabled, 0))
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
@@ -325,7 +349,7 @@ __declspec(dllexport) int catkey_get_enabled(void) {
 }
 
 __declspec(dllexport) void catkey_set_method(int method) {
-    if (method == CATKEY_VNI || method == CATKEY_VIQR)
+    if (method == CATKEY_VNI || method == CATKEY_VIQR || method == CATKEY_TEIP_VNI)
         InterlockedExchange(&g_method, method);
     else
         InterlockedExchange(&g_method, CATKEY_TELEX);
@@ -337,6 +361,12 @@ __declspec(dllexport) void catkey_set_method(int method) {
 __declspec(dllexport) void catkey_set_toggle_key(int vk, int mods) {
     InterlockedExchange(&g_toggle_vk, vk);
     InterlockedExchange(&g_toggle_mods, mods);
+}
+
+/* Configure the restore-original-word hotkey. vk=0 disables it. */
+__declspec(dllexport) void catkey_set_restore_key(int vk, int mods) {
+    InterlockedExchange(&g_restore_vk, vk);
+    InterlockedExchange(&g_restore_mods, mods);
 }
 
 __declspec(dllexport) int catkey_is_running(void) {

@@ -45,6 +45,7 @@ from .config import (
     MODE_TEIP,
     MODE_VNI,
     MODE_VIQR,
+    MODE_TEIP_VNI,
     load_config,
     save_config,
     get_platform,
@@ -56,6 +57,45 @@ from .core import (
     hook_get_enabled,
 )
 from .i18n import _, set_language, current_language, LANG_EN, LANG_VI
+
+# Win32 virtual-key codes used by the C hook hotkey ABI (vk, mods).
+# mods mask: 1=Ctrl, 2=Shift, 4=Alt. vk=0 => modifiers-only combo.
+_VK = {
+    Qt.Key_A: 0x41, Qt.Key_B: 0x42, Qt.Key_C: 0x43, Qt.Key_D: 0x44,
+    Qt.Key_E: 0x45, Qt.Key_F: 0x46, Qt.Key_G: 0x47, Qt.Key_H: 0x48,
+    Qt.Key_I: 0x49, Qt.Key_J: 0x4A, Qt.Key_K: 0x4B, Qt.Key_L: 0x4C,
+    Qt.Key_M: 0x4D, Qt.Key_N: 0x4E, Qt.Key_O: 0x4F, Qt.Key_P: 0x50,
+    Qt.Key_Q: 0x51, Qt.Key_R: 0x52, Qt.Key_S: 0x53, Qt.Key_T: 0x54,
+    Qt.Key_U: 0x55, Qt.Key_V: 0x56, Qt.Key_W: 0x57, Qt.Key_X: 0x58,
+    Qt.Key_Y: 0x59, Qt.Key_Z: 0x5A,
+    Qt.Key_F1: 0x70, Qt.Key_F2: 0x71, Qt.Key_F3: 0x72, Qt.Key_F4: 0x73,
+    Qt.Key_F5: 0x74, Qt.Key_F6: 0x75, Qt.Key_F7: 0x76, Qt.Key_F8: 0x77,
+    Qt.Key_F9: 0x78, Qt.Key_F10: 0x79, Qt.Key_F11: 0x7A, Qt.Key_F12: 0x7B,
+    Qt.Key_Space: 0x20, Qt.Key_Tab: 0x09, Qt.Key_Backspace: 0x08,
+    Qt.Key_Return: 0x0D, Qt.Key_Delete: 0x2E, Qt.Key_Insert: 0x2D,
+}
+
+
+def _seq_to_vk_mods(seq: str):
+    """Convert a QKeySequence string (e.g. 'Ctrl+Shift+Z') to (vk, mods).
+
+    mods mask: 1=Ctrl, 2=Shift, 4=Alt. Returns (0, 0) if empty/unparseable."""
+    if not seq:
+        return 0, 0
+    mods = 0
+    vk = 0
+    for part in (seq or "").split("+"):
+        p = part.strip().lower()
+        if p == "ctrl" or p == "control":
+            mods |= 1
+        elif p == "shift":
+            mods |= 2
+        elif p == "alt" or p == "meta":
+            mods |= 4
+        elif len(p) == 1:
+            key = getattr(Qt, "Key_" + p.upper(), None)
+            vk = _VK.get(key, 0) if key is not None else 0
+    return vk, mods
 
 
 # ---------------------------------------------------------------------------
@@ -246,9 +286,6 @@ class MainWindow(QMainWindow):
                                "Notify when Vietnamese typing is turned on or off"))
         yb.addWidget(self._chk("auto_check_update", "Auto check for update at boot time"))
         yb.addWidget(self._chk("customize_tray_icon", "Customize Tray icon"))
-        lbl_sy = QLabel(_("Auto-run / Auto-update / Dialog at startup are not wired yet (alpha)."))
-        lbl_sy.setStyleSheet("color:#888; font-style:italic;")
-        yb.addWidget(lbl_sy)
         lay.addWidget(system)
         lay.addStretch()
         return w
@@ -256,9 +293,6 @@ class MainWindow(QMainWindow):
     def _tab_shortkeys(self) -> QWidget:
         w = QWidget()
         form = QFormLayout(w)
-        lbl_sk = QLabel(_("Restore/Reset shortkeys are not wired yet (alpha). Switch works via pynput."))
-        lbl_sk.setStyleSheet("color:#888; font-style:italic;")
-        form.addRow(lbl_sk)
         self.key_switch = QKeySequenceEdit()
         self.key_restore = QKeySequenceEdit()
         self.key_reset = QKeySequenceEdit()
@@ -428,10 +462,12 @@ class MainWindow(QMainWindow):
 
     def _engine_mode(self) -> str:
         name = self.cmb_method.currentText()
-        if "VNI" in name:
-            return MODE_VNI
         if "VIQR" in name:
             return MODE_VIQR
+        if "VNI" in name:
+            return MODE_VNI
+        if "Telex + VNI" in name:
+            return MODE_TEIP_VNI
         return MODE_TEIP
 
     def _update_preview(self, *args):
@@ -583,15 +619,29 @@ class CatKeyApp:
                 QSystemTrayIcon.Information, 1200,
             )
 
+    def _apply_hotkeys(self):
+        """Push the toggle + restore shortkeys from config into the C hook."""
+        if not hook_available():
+            return
+        from .core import hook_set_toggle_key, hook_set_restore_key
+
+        vk, mods = _seq_to_vk_mods(self.config.get("shortkey_switch", "Ctrl+Shift"))
+        hook_set_toggle_key(vk, mods)
+        rvk, rmods = _seq_to_vk_mods(self.config.get("shortkey_restore", ""))
+        hook_set_restore_key(rvk, rmods)
+
     def _apply_hook_state(self):
         """Sync the C hook engine with current config (enabled + method)."""
         if not hook_available():
             return
+        self._apply_hotkeys()
         im = self.config.get("input_method", "")
-        if "VNI" in im:
-            method = MODE_VNI
-        elif "VIQR" in im:
+        if "VIQR" in im:
             method = MODE_VIQR
+        elif "VNI" in im:
+            method = MODE_VNI
+        elif "Telex + VNI" in im:
+            method = MODE_TEIP_VNI
         else:
             method = MODE_TEIP
         hook_set_method(method)
@@ -738,6 +788,9 @@ class CatKeyApp:
         self.tray.setContextMenu(self._build_menu())
         self._update_tooltip()
         self._apply_hook_state()
+        # Keep the OS auto-run entry in sync with the checkbox.
+        from .config import set_autorun
+        set_autorun(bool(self.config.get("auto_run_boot", False)))
         # Rebind the global hotkey in case the shortkey was changed.
         if getattr(self, "_hotkey", None):
             self._hotkey.set_combo(self.config.get("shortkey_switch", "Ctrl+Shift"))

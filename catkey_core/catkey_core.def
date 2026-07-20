@@ -9,4 +9,5 @@ EXPORTS
     catkey_get_enabled
     catkey_set_method
     catkey_set_toggle_key
+    catkey_set_restore_key
     catkey_is_running

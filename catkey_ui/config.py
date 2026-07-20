@@ -24,7 +24,7 @@ INPUT_METHODS = [
     "VNI Windows",
     "Simple Telex (no conv.)",
     "Simple Telex 2 (no conv.)",
-    "Telex + VNI (no conv.)",
+    "Telex + VNI",
     "VIQR",
     "Microsoft VI Layout (no conv.)",
     "User defined (no conv.)",
@@ -82,6 +82,7 @@ METHODS = [
 MODE_TEIP = "teip"
 MODE_VNI = "vni"
 MODE_VIQR = "viqr"
+MODE_TEIP_VNI = "teip_vni"
 
 DEFAULT_CONFIG = {
     # UI language: "en" or "vi" (interface language, not the typing engine)
@@ -189,4 +190,64 @@ def is_method_available(method_id: str) -> bool:
     for m in METHODS:
         if m["id"] == method_id:
             return platform in m["platforms"]
+    return False
+
+
+def set_autorun(enabled: bool) -> bool:
+    """Enable/disable CatKey launching at user login.
+
+    Windows: HKCU\\...\\Run registry value. Linux: XDG autostart .desktop.
+    Returns True on success. Best-effort; failures are swallowed."""
+    try:
+        import sys
+        if sys.platform == "win32":
+            try:
+                import winreg
+            except Exception:
+                return False
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0, winreg.KEY_SET_VALUE | winreg.KEY_QUERY_VALUE)
+            if enabled:
+                cmd = '"{}" "{}"'.format(sys.executable, _entry_script())
+                winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmd)
+            else:
+                try:
+                    winreg.DeleteValue(key, APP_NAME)
+                except FileNotFoundError:
+                    pass
+            winreg.CloseKey(key)
+            return True
+        else:
+            autostart = Path.home() / ".config" / "autostart"
+            dest = autostart / "catkey.desktop"
+            if enabled:
+                autostart.mkdir(parents=True, exist_ok=True)
+                dest.write_text(
+                    "[Desktop Entry]\n"
+                    "Type=Application\n"
+                    "Name=CatKey\n"
+                    "Comment=Vietnamese Input Method\n"
+                    "Exec={} {}\n"
+                    "Terminal=false\n"
+                    "X-GNOME-Autostart-enabled=true\n".format(
+                        sys.executable, _entry_script()),
+                    encoding="utf-8")
+            else:
+                if dest.exists():
+                    dest.unlink()
+            return True
+    except Exception:
+        return False
+
+
+def _entry_script() -> str:
+    """Path to launch CatKey. In a frozen build this is the exe itself;
+    from source it is run_ui.py next to the package."""
+    import sys
+    if getattr(sys, "frozen", False):
+        return sys.executable
+    here = Path(__file__).resolve().parent.parent
+    return str(here / "run_ui.py")
     return False

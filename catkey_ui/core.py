@@ -16,6 +16,7 @@ _METHOD_RAW = 0
 _METHOD_TEIP = 1
 _METHOD_VNI = 2
 _METHOD_VIQR = 3
+_METHOD_TEIP_VNI = 4
 _MAX_OUTPUT = 128
 
 def _data_root() -> Path:
@@ -55,6 +56,7 @@ def _bind(lib):
         lib.catkey_get_enabled.restype = ctypes.c_int
         lib.catkey_set_method.argtypes = [ctypes.c_int]
         lib.catkey_set_toggle_key.argtypes = [ctypes.c_int, ctypes.c_int]
+        lib.catkey_set_restore_key.argtypes = [ctypes.c_int, ctypes.c_int]
         lib.catkey_is_running.restype = ctypes.c_int
         _HAS_HOOK = True
     except AttributeError:
@@ -150,10 +152,11 @@ def core_available() -> bool:
 
 
 def convert_word(word: str, method: str) -> str:
-    """Convert a word via the C core. method is 'teip', 'vni', or 'viqr'."""
+    """Convert a word via the C core. method is 'teip', 'vni', 'viqr', 'teip_vni'."""
     if _LIB is None:
         return word
-    m = {'vni': _METHOD_VNI, 'viqr': _METHOD_VIQR}.get(method, _METHOD_TEIP)
+    m = {'vni': _METHOD_VNI, 'viqr': _METHOD_VIQR,
+         'teip_vni': _METHOD_TEIP_VNI}.get(method, _METHOD_TEIP)
     buf = ctypes.create_string_buffer(_MAX_OUTPUT)
     n = _LIB.catkey_convert_word(word.encode("utf-8"), buf, _MAX_OUTPUT, m)
     if n <= 0:
@@ -186,7 +189,8 @@ def hook_set_enabled(on: bool) -> None:
 
 def hook_set_method(method: str) -> None:
     if hook_available():
-        m = {'vni': _METHOD_VNI, 'viqr': _METHOD_VIQR}.get(method, _METHOD_TEIP)
+        m = {'vni': _METHOD_VNI, 'viqr': _METHOD_VIQR,
+             'teip_vni': _METHOD_TEIP_VNI}.get(method, _METHOD_TEIP)
         _LIB.catkey_set_method(m)
 
 
@@ -208,3 +212,9 @@ def hook_set_toggle_key(vk: int, mods: int) -> None:
     """Set the global VN/EN toggle hotkey. vk=0 => modifiers-only combo."""
     if hook_available():
         _LIB.catkey_set_toggle_key(int(vk), int(mods))
+
+
+def hook_set_restore_key(vk: int, mods: int) -> None:
+    """Set the restore-original-word hotkey. vk=0 => disabled."""
+    if hook_available():
+        _LIB.catkey_set_restore_key(int(vk), int(mods))

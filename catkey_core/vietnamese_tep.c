@@ -18,6 +18,7 @@
 #define CATKEY_TEIP 1
 #define CATKEY_VNI 2
 #define CATKEY_VIQR 3
+#define CATKEY_TEIP_VNI 4
 #define MAX_OUTPUT_LENGTH 64
 
 /* Tone indices */
@@ -474,10 +475,117 @@ static int convert_viqr(const char *in, char *out, int max) {
 
 /* ---- Public API (unchanged signatures) -------------------------------- */
 
+/*
+ * Telex + VNI combined mode.
+ *
+ * Accepts BOTH Telex and VNI keystrokes in one stream:
+ *   - VNI digits (0-9) apply VNI tone/marks to the last vowel
+ *   - Telex markers (w, s/f/r/x/j/z, and double-vowel ^/breve) apply Telex
+ *   - everything else is a normal letter
+ * This lets a user mix, e.g. "vie6t" (VNI) and "vieejt" (Telex) freely.
+ */
+static int convert_teip_vni(const char *in, char *out, int max) {
+    Letter ls[64];
+    int n = 0;
+    for (const char *p = in; *p && n < 63; p++) {
+        char c = *p;
+        char lc = (char)tolower((unsigned char)c);
+        int upper = isupper((unsigned char)c) ? 1 : 0;
+
+        /* VNI digit rules */
+        int t = vni_tone(lc);
+        if (t >= 0) {
+            int vi = tone_vowel_index(ls, n);
+            if (vi >= 0) { ls[vi].tone = t; continue; }
+        }
+        if (lc >= '0' && lc <= '9') {
+            if (lc == '6') {
+                int vi = last_vowel_index(ls, n);
+                if (vi >= 0 && (ls[vi].c=='a'||ls[vi].c=='e'||ls[vi].c=='o')) { ls[vi].variant = 1; continue; }
+            } else if (lc == '7') {
+                int vi = last_vowel_index(ls, n);
+                if (vi >= 0 && (ls[vi].c=='o'||ls[vi].c=='u')) {
+                    ls[vi].variant = 2;
+                    if (ls[vi].c == 'o' && vi > 0 && ls[vi-1].c == 'u') ls[vi-1].variant = 2;
+                    continue;
+                }
+            } else if (lc == '8') {
+                int vi = last_vowel_index(ls, n);
+                if (vi >= 0 && ls[vi].c=='a') { ls[vi].variant = 2; continue; }
+            } else if (lc == '9') {
+                for (int i = n-1; i >= 0; i--) if (ls[i].c=='d' && !ls[i].is_vowel) {
+                    ls[i].is_dstroke = 1; if (upper) ls[i].upper = 1; break;
+                }
+                continue;
+            } else if (lc == '0') {
+                continue; /* remove tone marker */
+            }
+            /* fall through: digit not consumed as a mark -> normal letter */
+        }
+
+        /* Telex dd -> đ */
+        if (lc == 'd' && n > 0 && ls[n-1].c == 'd' && !ls[n-1].is_dstroke
+            && !ls[n-1].is_vowel) {
+            ls[n-1].is_dstroke = 1;
+            if (upper) ls[n-1].upper = 1;
+            continue;
+        }
+
+        /* Telex circumflex: double same vowel */
+        if (is_vowel(lc) && n > 0 && ls[n-1].is_vowel && ls[n-1].c == lc
+            && ls[n-1].variant == 0 && (lc=='a'||lc=='e'||lc=='o')) {
+            ls[n-1].variant = 1;
+            if (upper) ls[n-1].upper = 1;
+            continue;
+        }
+
+        /* Telex w (breve/horn) */
+        if (lc == 'w') {
+            int vi = last_vowel_index(ls, n);
+            if (vi >= 0) {
+                char b = ls[vi].c;
+                if (b == 'a') { ls[vi].variant = 2; continue; }
+                if (b == 'o') {
+                    ls[vi].variant = 2;
+                    if (vi > 0 && ls[vi-1].c == 'u') ls[vi-1].variant = 2;
+                    continue;
+                }
+                if (b == 'u') { ls[vi].variant = 2; continue; }
+                if (b == 'e') { ls[vi].variant = 1; continue; }
+            } else {
+                ls[n].c = 'u'; ls[n].is_vowel = 1; ls[n].variant = 2;
+                ls[n].tone = T_NONE; ls[n].is_dstroke = 0; ls[n].upper = upper;
+                n++; continue;
+            }
+        }
+
+        /* Telex tone marks */
+        int tt = tone_from_telex(lc);
+        if (tt >= 0) {
+            int vi = tone_vowel_index(ls, n);
+            if (vi >= 0 && ls[vi].tone == T_NONE) { ls[vi].tone = tt; continue; }
+        }
+        if (lc == 'z') {
+            int vi = tone_vowel_index(ls, n);
+            if (vi >= 0) { ls[vi].tone = T_NONE; continue; }
+        }
+
+        ls[n].c = lc;
+        ls[n].is_vowel = is_vowel(lc);
+        ls[n].variant = 0;
+        ls[n].tone = T_NONE;
+        ls[n].is_dstroke = 0;
+        ls[n].upper = upper;
+        n++;
+    }
+    return emit_letters(ls, n, out, max);
+}
+
 int catkey_convert_word(const char *word, char *output, int max_len, int method) {
     if (!word || !output || max_len < 1) return 0;
-    if (method == CATKEY_VNI)  return convert_vni(word, output, max_len);
-    if (method == CATKEY_VIQR) return convert_viqr(word, output, max_len);
+    if (method == CATKEY_VNI)        return convert_vni(word, output, max_len);
+    if (method == CATKEY_VIQR)       return convert_viqr(word, output, max_len);
+    if (method == CATKEY_TEIP_VNI)   return convert_teip_vni(word, output, max_len);
     return convert_telex(word, output, max_len);
 }
 
@@ -523,6 +631,11 @@ int main(void) {
         {"vie^'t", "viết", CATKEY_VIQR},
         {"nu+o+'c", "nước", CATKEY_VIQR},
         {"ngu+o+`i", "người", CATKEY_VIQR},
+        {"vie61t", "viết", CATKEY_TEIP_VNI},
+        {"vieejt", "việt", CATKEY_TEIP_VNI},
+        {"tie61ng", "tiếng", CATKEY_TEIP_VNI},
+        {"a6", "â", CATKEY_TEIP_VNI},
+        {"dd", "đ", CATKEY_TEIP_VNI},
     };
     char buf[MAX_OUTPUT_LENGTH];
     int failed = 0;

@@ -14,6 +14,7 @@ extern "C" {
 #define CATKEY_METHOD_TEIP     1
 #define CATKEY_METHOD_VNI      2
 #define CATKEY_METHOD_VIQR     3
+#define CATKEY_METHOD_TEIP_VNI 4
 
 #define CATKEY_MAX_KEY_SEQUENCE   10
 #define CATKEY_MAX_OUTPUT_LENGTH  32
