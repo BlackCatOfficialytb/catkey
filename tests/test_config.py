@@ -52,6 +52,12 @@ class TestConfig(unittest.TestCase):
             finally:
                 config._config_dir = orig_dir
 
+    def test_autorun_path_escaping(self):
+        # Backslashes and embedded double-quotes must be escaped.
+        self.assertEqual(config._escape_win_arg(r'a\b"c'), 'a\\\\b\\"c')
+        self.assertEqual(config._desktop_quote("a b"), '"a b"')
+        self.assertEqual(config._desktop_quote('a"b'), '"a\\"b"')
+
 
 if __name__ == "__main__":
     unittest.main()

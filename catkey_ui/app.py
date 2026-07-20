@@ -586,10 +586,14 @@ class CatKeyApp:
             hook_start()
             self._apply_hook_state()
 
-        # Global toggle hotkey via pynput (marshalled to GUI thread by signal).
+        # Global toggle hotkey. On Windows the C hook already owns the toggle
+        # (catkey_set_toggle_key); running a second pynput listener for the same
+        # combo would fire it twice. Only use pynput where there is no C hook
+        # (Linux / non-Windows).
         self._hk_bridge = _HotkeyBridge()
         self._hk_bridge.triggered.connect(self._toggle_vietnamese)
-        self._start_hotkey()
+        if not hook_available():
+            self._start_hotkey()
 
         # Warn about conflicting Vietnamese input tools running in background.
         QTimer.singleShot(800, self._check_conflicts)
@@ -791,8 +795,9 @@ class CatKeyApp:
         # Keep the OS auto-run entry in sync with the checkbox.
         from .config import set_autorun
         set_autorun(bool(self.config.get("auto_run_boot", False)))
-        # Rebind the global hotkey in case the shortkey was changed.
-        if getattr(self, "_hotkey", None):
+        # Rebind the pynput toggle listener in case the shortkey changed.
+        # (Only present on platforms without the C hook toggle.)
+        if not hook_available() and getattr(self, "_hotkey", None):
             self._hotkey.set_combo(self.config.get("shortkey_switch", "Ctrl+Shift"))
 
     def _show_window(self):

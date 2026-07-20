@@ -209,8 +209,9 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
     }
 
     /* --- Restore hotkey: re-type the original (un-converted) word --- */
+    /* Only meaningful while Vietnamese typing is enabled. */
     LONG rvk = InterlockedOr(&g_restore_vk, 0);
-    if (rvk != 0 && is_down && g_raw_len > 0) {
+    if (rvk != 0 && is_down && g_raw_len > 0 && InterlockedOr(&g_enabled, 0)) {
         LONG rmods = InterlockedOr(&g_restore_mods, 0);
         int rmods_ok = ((rmods & 1) ? ctrl  : 1) &&
                        ((rmods & 2) ? shift : 1) &&

@@ -210,7 +210,11 @@ def set_autorun(enabled: bool) -> bool:
                 r"Software\Microsoft\Windows\CurrentVersion\Run",
                 0, winreg.KEY_SET_VALUE | winreg.KEY_QUERY_VALUE)
             if enabled:
-                cmd = '"{}" "{}"'.format(sys.executable, _entry_script())
+                # Quote each path; escape any embedded double-quotes so a path
+                # containing " cannot break out and inject extra arguments.
+                cmd = '"{}" "{}"'.format(
+                    _escape_win_arg(sys.executable),
+                    _escape_win_arg(_entry_script()))
                 winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, cmd)
             else:
                 try:
@@ -232,7 +236,8 @@ def set_autorun(enabled: bool) -> bool:
                     "Exec={} {}\n"
                     "Terminal=false\n"
                     "X-GNOME-Autostart-enabled=true\n".format(
-                        sys.executable, _entry_script()),
+                        _desktop_quote(sys.executable),
+                        _desktop_quote(_entry_script())),
                     encoding="utf-8")
             else:
                 if dest.exists():
@@ -250,4 +255,21 @@ def _entry_script() -> str:
         return sys.executable
     here = Path(__file__).resolve().parent.parent
     return str(here / "run_ui.py")
+
+
+def _escape_win_arg(path: str) -> str:
+    """Escape a path for a Windows Run registry value (double-quoted arg).
+
+    Per the Windows command-line rules, a double-quoted argument must have
+    its embedded backslashes and double-quotes escaped."""
+    s = path.replace("\\", "\\\\").replace('"', '\\"')
+    return s
+
+
+def _desktop_quote(path: str) -> str:
+    """Quote an argument for a .desktop Exec= line (Desktop Entry spec).
+
+    Double-quotes are escaped as \\" and the whole arg wrapped in quotes so
+    paths containing spaces/specials are treated as a single argument."""
+    return '"' + path.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return False
