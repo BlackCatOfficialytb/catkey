@@ -128,15 +128,9 @@ def _try_build():
 
 
 def _load():
-    for name in _lib_names():
-        p = _CORE_DIR / name
-        if p.exists():
-            try:
-                return _bind(ctypes.CDLL(str(p)))
-            except OSError:
-                pass
-    # Not found: try to build it once, then load.
-    _try_build()
+    # Only load a prebuilt library at import time. Building (which spawns a
+    # compiler) is deferred to _ensure_core() so merely importing catkey_ui
+    # does not trigger a toolchain invocation.
     for name in _lib_names():
         p = _CORE_DIR / name
         if p.exists():
@@ -148,14 +142,35 @@ def _load():
 
 
 _LIB = _load()
+_BUILT = False
+
+
+def _ensure_core():
+    """Lazily build the core library on first use if none was prebuilt."""
+    global _LIB, _BUILT
+    if _LIB is not None or _BUILT:
+        return
+    _BUILT = True
+    _try_build()
+    for name in _lib_names():
+        p = _CORE_DIR / name
+        if p.exists():
+            try:
+                _LIB = _bind(ctypes.CDLL(str(p)))
+                return
+            except OSError:
+                pass
 
 
 def core_available() -> bool:
+    _ensure_core()
     return _LIB is not None
 
 
 def convert_word(word: str, method: str) -> str:
     """Convert a word via the C core. method is 'teip', 'vni', 'viqr', 'teip_vni'."""
+    if _LIB is None:
+        _ensure_core()
     if _LIB is None:
         return word
     m = {'vni': _METHOD_VNI, 'viqr': _METHOD_VIQR,
@@ -171,6 +186,7 @@ def convert_word(word: str, method: str) -> str:
 
 def hook_available() -> bool:
     """True if the C core exposes the system-wide keyboard hook."""
+    _ensure_core()
     return _LIB is not None and _HAS_HOOK
 
 

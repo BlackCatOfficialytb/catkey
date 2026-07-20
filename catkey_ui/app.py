@@ -569,8 +569,13 @@ class CatKeyApp:
         # second keyboard hook (which caused doubled/tripled keystrokes).
         self._single = QSharedMemory("CatKey_SingleInstance_v1")
         if self._single.attach():
-            # Already running elsewhere.
+            # Already running elsewhere: tell the user instead of failing silently.
             self._is_primary = False
+            QMessageBox.information(
+                None, APP_NAME,
+                _("CatKey is already running.\n\n")
+                + _("Use the system tray icon to open the settings window."),
+            )
             return
         self._is_primary = self._single.create(1)
 

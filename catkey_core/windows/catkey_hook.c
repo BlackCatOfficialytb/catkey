@@ -55,14 +55,12 @@ static volatile LONG g_restore_mods = 1 | 2;  /* Ctrl+Shift by default */
 static char g_raw[BUF_MAX];
 static int  g_raw_len = 0;
 static int  g_shown_units = 0;   /* # of UTF-16 code units currently on screen */
-static int  g_was_converted = 0; /* last recompute_and_apply rewrote screen */
 
 static int g_sending = 0;        /* re-entrancy guard while we SendInput */
 
 static void reset_word(void) {
     g_raw_len = 0;
     g_shown_units = 0;
-    g_was_converted = 0;
 }
 
 /* Count UTF-16 code units needed for a UTF-8 string (BMP chars = 1 unit;
@@ -71,6 +69,13 @@ static int utf16_units(const wchar_t *w) {
     int n = 0;
     while (w[n]) n++;
     return n;
+}
+
+/* UTF-16 units a single 1-byte char occupies on screen (1 for ASCII). */
+static int char_units(char ch) {
+    wchar_t w;
+    int n = MultiByteToWideChar(CP_UTF8, 0, &ch, 1, &w, 1);
+    return n > 0 ? n : 1;
 }
 
 /* Send `count` backspaces then the wide string `w`. */
@@ -123,7 +128,7 @@ static void rewrite(int backspaces, const wchar_t *w) {
  * g_shown_units always tracks how many UTF-16 units are currently on screen
  * for this word, whether they arrived via pass-through or via our SendInput.
  */
-static int recompute_and_apply(void) {
+static int recompute_and_apply(int added_units) {
     if (g_raw_len == 0) return 0;
     g_raw[g_raw_len] = 0;
 
@@ -134,20 +139,20 @@ static int recompute_and_apply(void) {
 
     /* If conversion equals the raw ASCII, nothing to do: let the key through. */
     if (strcmp(utf8, g_raw) == 0) {
-        g_shown_units += 1;   /* the pass-through key adds one unit */
+        /* The OS will display exactly `added_units` code units for this key. */
+        g_shown_units += (added_units > 0 ? added_units : 1);
         return 0;
     }
 
     wchar_t wbuf[BUF_MAX * 2];
     int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wbuf, BUF_MAX * 2);
-    if (wlen <= 0) { g_shown_units += 1; return 0; }
+    if (wlen <= 0) { g_shown_units += (added_units > 0 ? added_units : 1); return 0; }
     wlen -= 1; /* exclude null */
 
     /* Rewrite: the original key hasn't been shown yet (we will swallow it),
      * so only delete what is currently on screen (g_shown_units). */
     rewrite(g_shown_units, wbuf);
     g_shown_units = wlen;
-    g_was_converted = 1;
     return 1;
 }
 
@@ -277,7 +282,7 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
         if (viqr_ch) {
             if (g_raw_len >= BUF_MAX - 1) reset_word();
             g_raw[g_raw_len++] = viqr_ch;
-            if (recompute_and_apply())
+            if (recompute_and_apply(char_units(viqr_ch)))
                 return 1;
             return CallNextHookEx(g_hook, nCode, wParam, lParam);
         }
@@ -302,7 +307,7 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
      * original key pass through (avoids doubling). If a diacritic applied we
      * rewrote the screen ourselves, so swallow the original key. */
     g_raw[g_raw_len++] = ch;
-    if (recompute_and_apply())
+    if (recompute_and_apply(char_units(ch)))
         return 1;  /* swallowed: we already emitted the corrected word */
     return CallNextHookEx(g_hook, nCode, wParam, lParam); /* pass through */
 }
