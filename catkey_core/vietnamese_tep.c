@@ -458,6 +458,7 @@ static int convert_viqr(const char *in, char *out, int max) {
         if (lc == 'd' && n > 0 && ls[n-1].c == 'd' && !ls[n-1].is_dstroke
             && !ls[n-1].is_vowel) {
             ls[n-1].is_dstroke = 1;
+            if (isupper((unsigned char)c)) ls[n-1].upper = 1;
             continue;
         }
 

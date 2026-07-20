@@ -78,11 +78,14 @@ def _try_build():
         if hook.exists():
             srcs.append(str(hook))
         # 1) try gcc/clang if on PATH (no vcvars needed)
+        # The .def MUST come before the sources so MinGW exports the symbols
+        # (functions are not __declspec(dllexport)); otherwise the DLL exposes
+        # nothing and conversion silently fails on first run.
         for cc in ("gcc", "clang"):
             try:
                 subprocess.run(
-                    [cc, "-shared", "-O2", "-municode", "-o", str(out), *srcs,
-                     "-luser32", "-Wl,--out-implib,NUL"],
+                    [cc, "-shared", "-O2", "-municode", "-o", str(out),
+                     str(deff), *srcs, "-luser32", "-Wl,--kill-at,--out-implib,NUL"],
                     cwd=str(_CORE_DIR), capture_output=True, timeout=90, check=True,
                 )
                 if out.exists():
