@@ -50,6 +50,19 @@ static int g_combo_latch = 0;                 /* prevents repeat while held */
 static volatile LONG g_restore_vk   = 0;
 static volatile LONG g_restore_mods = 1 | 2;  /* Ctrl+Shift by default */
 
+/* Reset hotkey: clear the current word buffer. vk=0 disables. */
+static volatile LONG g_reset_vk   = 0;
+static volatile LONG g_reset_mods = 0;
+
+/* Exception apps: comma-separated lowercase exe names.  When the foreground
+ * window belongs to one of these, conversion is skipped (keys pass through). */
+#define EXC_MAX 512
+static char  g_exceptions[EXC_MAX];
+static int   g_exc_len = 0;
+static DWORD g_last_fg_pid = 0;
+static HWND  g_last_fg_hwnd = NULL;
+static int   g_last_in_exc = 0;  /* cached: is current fg app in exception list? */
+
 /* Current word buffer: the raw keys the user typed (ASCII), plus the number
  * of on-screen characters we last produced (so we know how many to delete). */
 static char g_raw[BUF_MAX];
@@ -57,10 +70,61 @@ static int  g_raw_len = 0;
 static int  g_shown_units = 0;   /* # of UTF-16 code units currently on screen */
 
 static int g_sending = 0;        /* re-entrancy guard while we SendInput */
+static int g_auto_upper = 0;    /* auto-upper after sentence punctuation */
+static volatile LONG g_auto_upper_cfg = 0; /* config: 1 = feature on */
 
 static void reset_word(void) {
     g_raw_len = 0;
     g_shown_units = 0;
+}
+
+/* Check if the foreground window belongs to an app in the exception list.
+ * Caches the result and only re-queries when the foreground window changes. */
+static int is_exception_app(void) {
+    HWND fg = GetForegroundWindow();
+    if (fg == g_last_fg_hwnd) return g_last_in_exc;
+
+    DWORD pid = 0;
+    GetWindowThreadProcessId(fg, &pid);
+    g_last_fg_hwnd = fg;
+    g_last_fg_pid = pid;
+
+    if (g_exc_len == 0) { g_last_in_exc = 0; return 0; }
+
+    /* Get the exe name for this PID. */
+    HANDLE proc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!proc) { g_last_in_exc = 0; return 0; }
+    wchar_t wname[MAX_PATH];
+    DWORD wname_len = MAX_PATH;
+    int ok = QueryFullProcessImageNameW(proc, 0, wname, &wname_len);
+    CloseHandle(proc);
+    if (!ok) { g_last_in_exc = 0; return 0; }
+
+    /* Extract just the filename portion and lowercase it. */
+    wchar_t *slash = wcsrchr(wname, L'\\');
+    wchar_t *leaf = slash ? slash + 1 : wname;
+    char name[MAX_PATH];
+    int i;
+    for (i = 0; leaf[i] && i < MAX_PATH - 1; i++)
+        name[i] = (char)towlower(leaf[i]);
+    name[i] = 0;
+
+    /* Check if name appears in the comma-separated exception list. */
+    const char *p = g_exceptions;
+    while (*p) {
+        /* skip leading commas */
+        while (*p == ',') p++;
+        if (!*p) break;
+        int len = 0;
+        while (p[len] && p[len] != ',') len++;
+        if (len == (int)strlen(name) && _strnicmp(p, name, len) == 0) {
+            g_last_in_exc = 1;
+            return 1;
+        }
+        p += len;
+    }
+    g_last_in_exc = 0;
+    return 0;
 }
 
 /* Count UTF-16 code units needed for a UTF-8 string (BMP chars = 1 unit;
@@ -228,6 +292,26 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
                                          BUF_MAX * 4 - 1);
             raw_w[ru] = 0;
             rewrite(g_shown_units, raw_w);
+            /* The raw text is now on screen: track its units so a following
+             * Backspace deletes the right amount before the next word. */
+            g_raw_len = 0;
+            g_shown_units = ru;
+            return 1; /* swallow the hotkey key */
+        }
+    }
+
+    /* --- Reset hotkey: clear the current word buffer --- */
+    LONG qvk = InterlockedOr(&g_reset_vk, 0);
+    if (qvk != 0 && is_down && InterlockedOr(&g_enabled, 0)) {
+        LONG qmods = InterlockedOr(&g_reset_mods, 0);
+        int qmods_ok = ((qmods & 1) ? ctrl  : 1) &&
+                       ((qmods & 2) ? shift : 1) &&
+                       ((qmods & 4) ? alt   : 1);
+        if (qmods_ok && vk == (DWORD)qvk) {
+            /* Delete the current converted word from the screen. */
+            if (g_shown_units > 0) {
+                rewrite(g_shown_units, L"");
+            }
             reset_word();
             return 1; /* swallow the hotkey key */
         }
@@ -236,6 +320,12 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
     /* If disabled, do nothing further (pass everything through). */
     if (!InterlockedOr(&g_enabled, 0))
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
+
+    /* If the foreground app is in the exception list, pass through. */
+    if (is_exception_app()) {
+        reset_word();
+        return CallNextHookEx(g_hook, nCode, wParam, lParam);
+    }
 
     if (!is_down)
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
@@ -257,6 +347,13 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (vk == VK_SPACE || vk == VK_RETURN || vk == VK_TAB ||
         vk == VK_ESCAPE || (vk >= VK_LEFT && vk <= VK_DOWN) ||
         vk == VK_HOME || vk == VK_END || vk == VK_DELETE) {
+        /* Auto-upper after sentence-ending punctuation (Enter . ! ?). */
+        if (InterlockedOr(&g_auto_upper_cfg, 0) &&
+            (vk == VK_RETURN || vk == VK_OEM_PERIOD || vk == '1' || vk == VK_OEM_2)) {
+            g_auto_upper = 1;
+        } else {
+            g_auto_upper = 0;
+        }
         reset_word();
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
     }
@@ -296,12 +393,28 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
         if (sh) { reset_word(); return CallNextHookEx(g_hook, nCode, wParam, lParam); }
         ch = (char)vk;
     } else {
-        /* punctuation etc: commit current word, pass through */
+        /* punctuation etc: commit current word, pass through.
+         * Detect sentence-ending punctuation for auto-upper. */
+        if (InterlockedOr(&g_auto_upper_cfg, 0) &&
+            (vk == VK_OEM_PERIOD || vk == VK_OEM_2)) {
+            g_auto_upper = 1;
+        } else {
+            g_auto_upper = 0;
+        }
         reset_word();
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
     }
 
     if (g_raw_len >= BUF_MAX - 1) reset_word();
+
+    /* Auto-upper: if the previous separator was sentence-ending, force
+     * the first letter of the new word to uppercase. */
+    if (g_auto_upper && vk >= 'A' && vk <= 'Z') {
+        caps = 0;  /* ignore CapsLock for auto-upper */
+        shift = 0;
+        ch = (char)vk;  /* uppercase */
+        g_auto_upper = 0;
+    }
 
     /* Add the raw key and convert. If the conversion is unchanged we let the
      * original key pass through (avoids doubling). If a diacritic applied we
@@ -373,6 +486,33 @@ __declspec(dllexport) void catkey_set_toggle_key(int vk, int mods) {
 __declspec(dllexport) void catkey_set_restore_key(int vk, int mods) {
     InterlockedExchange(&g_restore_vk, vk);
     InterlockedExchange(&g_restore_mods, mods);
+}
+
+/* Configure the reset-keyboard-state hotkey. vk=0 disables it. */
+__declspec(dllexport) void catkey_set_reset_key(int vk, int mods) {
+    InterlockedExchange(&g_reset_vk, vk);
+    InterlockedExchange(&g_reset_mods, mods);
+}
+
+/* Set the comma-separated list of exception app exe names (lowercase).
+ * When the foreground window belongs to one of these, conversion is skipped.
+ * Passing NULL or "" clears the list. Thread-safe via g_exceptions copy. */
+__declspec(dllexport) void catkey_set_exception_apps(const char *apps) {
+    g_exc_len = 0;
+    g_last_fg_hwnd = NULL;  /* invalidate cache */
+    if (!apps || !*apps) { g_exceptions[0] = 0; return; }
+    int len = (int)strlen(apps);
+    if (len >= EXC_MAX) len = EXC_MAX - 1;
+    memcpy(g_exceptions, apps, len);
+    g_exceptions[len] = 0;
+    g_exc_len = len;
+    /* Lowercase the whole buffer for case-insensitive matching. */
+    for (int i = 0; i < len; i++) g_exceptions[i] = (char)tolower((unsigned char)g_exceptions[i]);
+}
+
+/* Enable/disable auto-uppercase after sentence-ending punctuation. */
+__declspec(dllexport) void catkey_set_auto_upper(int on) {
+    InterlockedExchange(&g_auto_upper_cfg, on ? 1 : 0);
 }
 
 __declspec(dllexport) int catkey_is_running(void) {

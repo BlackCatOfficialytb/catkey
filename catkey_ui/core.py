@@ -57,6 +57,9 @@ def _bind(lib):
         lib.catkey_set_method.argtypes = [ctypes.c_int]
         lib.catkey_set_toggle_key.argtypes = [ctypes.c_int, ctypes.c_int]
         lib.catkey_set_restore_key.argtypes = [ctypes.c_int, ctypes.c_int]
+        lib.catkey_set_reset_key.argtypes = [ctypes.c_int, ctypes.c_int]
+        lib.catkey_set_exception_apps.argtypes = [ctypes.c_char_p]
+        lib.catkey_set_auto_upper.argtypes = [ctypes.c_int]
         lib.catkey_is_running.restype = ctypes.c_int
         _HAS_HOOK = True
     except AttributeError:
@@ -237,3 +240,23 @@ def hook_set_restore_key(vk: int, mods: int) -> None:
     """Set the restore-original-word hotkey. vk=0 => disabled."""
     if hook_available():
         _LIB.catkey_set_restore_key(int(vk), int(mods))
+
+
+def hook_set_reset_key(vk: int, mods: int) -> None:
+    """Set the reset-keyboard-state hotkey. vk=0 => disabled."""
+    if hook_available():
+        _LIB.catkey_set_reset_key(int(vk), int(mods))
+
+
+def hook_set_exception_apps(apps: list) -> None:
+    """Set the list of exception app exe names (e.g. ['putty.exe', 'mintty.exe']).
+    When the foreground window belongs to one of these, conversion is skipped."""
+    if hook_available():
+        s = ",".join(a.strip().lower() for a in apps if a.strip())
+        _LIB.catkey_set_exception_apps(s.encode("utf-8") if s else b"")
+
+
+def hook_set_auto_upper(on: bool) -> None:
+    """Enable/disable auto-uppercase after sentence-ending punctuation."""
+    if hook_available():
+        _LIB.catkey_set_auto_upper(1 if on else 0)

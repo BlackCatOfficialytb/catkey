@@ -10,4 +10,7 @@ EXPORTS
     catkey_set_method
     catkey_set_toggle_key
     catkey_set_restore_key
+    catkey_set_reset_key
+    catkey_set_exception_apps
+    catkey_set_auto_upper
     catkey_is_running

@@ -510,16 +510,28 @@ class MainWindow(QMainWindow):
                                               "Text files (*.txt);;All files (*)")
         if path:
             self.macro_file.setText(path)
+            self._save_now()
 
     def _add_exception(self):
         from PySide6.QtWidgets import QInputDialog
         name, ok = QInputDialog.getText(self, "Add exception", "Application executable:")
         if ok and name.strip():
             self.exc_list.addItem(name.strip())
+            self._save_now()
 
     def _remove_exception(self):
+        removed = False
         for it in self.exc_list.selectedItems():
             self.exc_list.takeItem(self.exc_list.row(it))
+            removed = True
+        if removed:
+            self._save_now()
+
+    def _save_now(self):
+        """Persist the current settings immediately (live UI, no Apply click)."""
+        self._collect()
+        save_config(self.config)
+        self.config_changed.emit(self.config)
 
     def closeEvent(self, event):
         if self._allow_close:
@@ -629,15 +641,17 @@ class CatKeyApp:
             )
 
     def _apply_hotkeys(self):
-        """Push the toggle + restore shortkeys from config into the C hook."""
+        """Push the toggle + restore + reset shortkeys from config into the C hook."""
         if not hook_available():
             return
-        from .core import hook_set_toggle_key, hook_set_restore_key
+        from .core import hook_set_toggle_key, hook_set_restore_key, hook_set_reset_key
 
         vk, mods = _seq_to_vk_mods(self.config.get("shortkey_switch", "Ctrl+Shift"))
         hook_set_toggle_key(vk, mods)
         rvk, rmods = _seq_to_vk_mods(self.config.get("shortkey_restore", ""))
         hook_set_restore_key(rvk, rmods)
+        qvk, qmods = _seq_to_vk_mods(self.config.get("shortkey_reset", ""))
+        hook_set_reset_key(qvk, qmods)
 
     def _apply_hook_state(self):
         """Sync the C hook engine with current config (enabled + method)."""
@@ -655,6 +669,10 @@ class CatKeyApp:
             method = MODE_TEIP
         hook_set_method(method)
         hook_set_enabled(bool(self.config.get("vietnamese_on", True)))
+        # Push the exception-apps list so the hook skips conversion in those.
+        from .core import hook_set_exception_apps, hook_set_auto_upper
+        hook_set_exception_apps(self.config.get("exception_apps", []))
+        hook_set_auto_upper(bool(self.config.get("auto_upper_after_punct", False)))
 
     def _toggle_vietnamese(self):
         """Toggle the Vietnamese typing engine on/off (tray + hotkey)."""
