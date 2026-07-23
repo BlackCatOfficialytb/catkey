@@ -46,7 +46,7 @@ Requirements: Python 3.11+, a C compiler (MSVC or GCC/Clang).
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install PySide6-Essentials pynput
+pip install -r requirements.txt
 python run_ui.py
 ```
 
