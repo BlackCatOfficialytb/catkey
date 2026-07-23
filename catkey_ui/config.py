@@ -100,6 +100,7 @@ DEFAULT_CONFIG = {
     "allow_fwjz_consonants": False,
     "auto_upper_after_punct": False,
     "allow_space_az": True,
+    "auto_change_charset": False,  # placeholder: Automatically change character set
 
     # Macro
     "macro_enabled": False,
@@ -126,6 +127,7 @@ DEFAULT_CONFIG = {
     "notify_on_toggle": True,   # show a tray notification when VN typing on/off
     "auto_check_update": True,
     "customize_tray_icon": False,
+    "dark_mode": False,  # placeholder: light/dark mode toggle
 
     # Exceptions
     "exception_apps": [],

@@ -222,6 +222,10 @@ class MainWindow(QMainWindow):
         btns.addWidget(self.btn_close)
         root.addLayout(btns)
 
+    def _update_method_config_btn(self, text: str):
+        """Enable the 3-dot button only for 'User defined' mode."""
+        self.btn_method_config.setEnabled(text == "User defined (no conv.)")
+
     def _tab_general(self) -> QWidget:
         w = QWidget()
         lay = QVBoxLayout(w)
@@ -232,12 +236,27 @@ class MainWindow(QMainWindow):
         self.cmb_method.addItems(INPUT_METHODS)
         self.cmb_method.currentTextChanged.connect(self._update_preview)
         lbl_m = self._track(QLabel(), "Input method:")
-        form.addRow(lbl_m, self.cmb_method)
+        # Add 3-dot button for User defined mode (placeholder)
+        self.btn_method_config = QPushButton("...")
+        self.btn_method_config.setFixedWidth(28)
+        self.btn_method_config.setToolTip("Configure User defined input method (placeholder)")
+        self.btn_method_config.setEnabled(False)
+        self.cmb_method.currentTextChanged.connect(self._update_method_config_btn)
+        method_row = QHBoxLayout()
+        method_row.addWidget(self.cmb_method)
+        method_row.addWidget(self.btn_method_config)
+        method_row.addStretch()
+        form.addRow(lbl_m, method_row)
 
         self.cmb_charset = QComboBox()
         self.cmb_charset.addItems(CHARSETS)
         lbl_c = self._track(QLabel(), "Character set:")
         form.addRow(lbl_c, self.cmb_charset)
+
+        # "Automatically change" placeholder in Character set section
+        self.chk_auto_charset = self._chk("auto_change_charset", "Automatically change (placeholder)")
+        self.chk_auto_charset.setEnabled(False)
+        form.addRow(self.chk_auto_charset)
         lay.addWidget(io_box)
 
         spell_box = self._track(QGroupBox(), "Spelling", "setTitle")
@@ -245,13 +264,13 @@ class MainWindow(QMainWindow):
         lbl_sp = QLabel(_("Spelling checks are not wired yet (alpha)."))
         lbl_sp.setStyleSheet("color:#888; font-style:italic;")
         sb.addWidget(lbl_sp)
-        sb.addWidget(self._chk("check_spelling", "Check basic spelling"))
+        sb.addWidget(self._chk("check_spelling", "Check basic spelling (WIP)"))
         sb.addWidget(self._chk("auto_restore_wrong_spelling",
-                               "Change back to original word on spelling mistake"))
+                               "Change back to original word on spelling mistake (WIP)"))
         sb.addWidget(self._chk("allow_fwjz_consonants",
-                               "Allow f, w, j, z as Vietnamese consonants in spelling check"))
+                               "Allow f, w, j, z as Vietnamese consonants in spelling check (WIP)"))
         sb.addWidget(self._chk("free_marking",
-                               "Free marking tone (behind the vowel or end of word)"))
+                               "Free marking tone (behind the vowel or end of word) (WIP)"))
         sb.addWidget(self._chk("auto_upper_after_punct",
                                'Auto Upper Case after "Enter . ! ?"'))
         lay.addWidget(spell_box)
@@ -267,13 +286,13 @@ class MainWindow(QMainWindow):
         lbl_co = QLabel(_("Compatibility options are not wired yet (alpha)."))
         lbl_co.setStyleSheet("color:#888; font-style:italic;")
         cb.addWidget(lbl_co)
-        cb.addWidget(self._chk("modern_style", "Modern style"))
-        cb.addWidget(self._chk("standard_key_sending", "Use standard key sending"))
-        cb.addWidget(self._chk("use_clipboard_send", "Use Clipboard for send key"))
+        cb.addWidget(self._chk("modern_style", "Modern style (WIP)"))
+        cb.addWidget(self._chk("standard_key_sending", "Use standard key sending (WIP)"))
+        cb.addWidget(self._chk("use_clipboard_send", "Use Clipboard for send key (WIP)"))
         cb.addWidget(self._chk("support_metro",
-                               "Support Metro apps (Mail, Facebook, Messenger)"))
+                               "Support Metro apps (Mail, Facebook, Messenger) (WIP)"))
         cb.addWidget(self._chk("fix_browser_excel",
-                               "Correct Vietnamese on browser address bar / Excel"))
+                               "Correct Vietnamese on browser address bar / Excel (WIP)"))
         lay.addWidget(compat)
 
         system = self._track(QGroupBox(), "System", "setTitle")
@@ -286,6 +305,10 @@ class MainWindow(QMainWindow):
                                "Notify when Vietnamese typing is turned on or off"))
         yb.addWidget(self._chk("auto_check_update", "Auto check for update at boot time"))
         yb.addWidget(self._chk("customize_tray_icon", "Customize Tray icon"))
+        # Light/Dark mode toggle (placeholder)
+        self.chk_dark_mode = self._chk("dark_mode", "Dark mode (placeholder)")
+        self.chk_dark_mode.setEnabled(False)
+        yb.addWidget(self.chk_dark_mode)
         lay.addWidget(system)
         lay.addStretch()
         return w
@@ -307,18 +330,18 @@ class MainWindow(QMainWindow):
         lbl_ma = QLabel(_("Macros are not wired yet (alpha)."))
         lbl_ma.setStyleSheet("color:#888; font-style:italic;")
         lay.addWidget(lbl_ma)
-        lay.addWidget(self._chk("macro_enabled", "Enable macros"))
+        lay.addWidget(self._chk("macro_enabled", "Enable macros (placeholder)"))
         lay.addWidget(self._chk("macro_even_if_off",
-                                "Allow macros even if Vietnamese is off"))
+                                "Allow macros even if Vietnamese is off (placeholder)"))
         row = QHBoxLayout()
         row.addWidget(self._track(QLabel(), "Macro file:"))
         self.macro_file = QLineEdit()
         row.addWidget(self.macro_file)
-        btn = self._track(QPushButton(), "Select...")
-        btn.clicked.connect(self._pick_macro_file)
+        btn = self._track(QPushButton(), "Select... (placeholder)")
+        btn.setEnabled(False)
         row.addWidget(btn)
         lay.addLayout(row)
-        lay.addWidget(self._track(QPushButton(), "Macro Table..."))
+        lay.addWidget(self._track(QPushButton(), "Macro Table... (placeholder)"))
         lay.addStretch()
         return w
 
@@ -342,7 +365,7 @@ class MainWindow(QMainWindow):
         row.addWidget(rem)
         row.addStretch()
         lay.addLayout(row)
-        lay.addWidget(self._chk("auto_prevent_vietnamese", "Auto prevent Vietnamese typing"))
+        lay.addWidget(self._chk("auto_prevent_vietnamese", "Auto prevent Vietnamese typing (WIP)"))
         return w
 
     def _tab_catkey(self) -> QWidget:
@@ -350,9 +373,9 @@ class MainWindow(QMainWindow):
         w = QWidget()
         lay = QVBoxLayout(w)
 
-        backend = QGroupBox("Platform Backend (CatKey)")
+        backend = QGroupBox("Platform Backend (CatKey) (placeholder)")
         bl = QVBoxLayout(backend)
-        note = QLabel("Backends unavailable on your platform are greyed out.")
+        note = QLabel("Backends unavailable on your platform are greyed out. Backend switching not implemented.")
         note.setStyleSheet("color:#888;")
         bl.addWidget(note)
         self.backend_list = QListWidget()
@@ -365,6 +388,7 @@ class MainWindow(QMainWindow):
                 it.setForeground(QColor("#999999"))
                 it.setFlags(it.flags() & ~Qt.ItemIsSelectable)
             self.backend_list.addItem(it)
+        self.backend_list.setEnabled(False)
         bl.addWidget(self.backend_list)
         lay.addWidget(backend)
 
@@ -397,9 +421,15 @@ class MainWindow(QMainWindow):
             f"<p>Core: <b>{'loaded' if core_available() else 'not built'}</b> "
             "(C engine via ctypes)</p>"
             "<p>UI: PySide6 &nbsp;|&nbsp; Engine: C</p>"
+            "<hr>"
+            '<p><a href="https://github.com/BlackCatOfficialytb/catkey">'
+            'https://github.com/BlackCatOfficialytb/catkey</a></p>'
+            "<p><i>Only download from official GitHub releases or GitHub Actions.</i></p>"
+            "<p><i>Not distributed anywhere else on GitHub or other websites.</i></p>"
         )
         lbl.setTextFormat(Qt.RichText)
         lbl.setAlignment(Qt.AlignTop)
+        lbl.setOpenExternalLinks(True)
         lay.addWidget(lbl)
         lay.addStretch()
         return w

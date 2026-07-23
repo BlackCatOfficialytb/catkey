@@ -336,10 +336,11 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
     }
 
-    /* Backspace: shrink our buffer and let it pass. */
+    /* Backspace: shrink our buffer, recompute, and rewrite the screen. */
     if (vk == VK_BACK) {
         if (g_raw_len > 0) g_raw_len--;
         if (g_shown_units > 0) g_shown_units--;
+        recompute_and_apply(0);
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
     }
 
