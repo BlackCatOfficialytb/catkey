@@ -57,6 +57,7 @@ from .core import (
     hook_get_enabled,
 )
 from .i18n import _, set_language, current_language, LANG_EN, LANG_VI
+from .user_defined import show_user_defined_dialog
 
 # Win32 virtual-key codes used by the C hook hotkey ABI (vk, mods).
 # mods mask: 1=Ctrl, 2=Shift, 4=Alt. vk=0 => modifiers-only combo.
@@ -226,6 +227,12 @@ class MainWindow(QMainWindow):
         """Enable the 3-dot button only for 'User defined' mode."""
         self.btn_method_config.setEnabled(text == "User defined (no conv.)")
 
+    def _on_user_defined_config(self):
+        """Open the User Defined customizer dialog."""
+        if show_user_defined_dialog(self):
+            # User saved - could refresh preview or do something
+            self._update_preview()
+
     def _tab_general(self) -> QWidget:
         w = QWidget()
         lay = QVBoxLayout(w)
@@ -236,11 +243,12 @@ class MainWindow(QMainWindow):
         self.cmb_method.addItems(INPUT_METHODS)
         self.cmb_method.currentTextChanged.connect(self._update_preview)
         lbl_m = self._track(QLabel(), "Input method:")
-        # Add 3-dot button for User defined mode (placeholder)
+        # Add 3-dot button for User defined mode (opens customizer dialog)
         self.btn_method_config = QPushButton("...")
         self.btn_method_config.setFixedWidth(28)
-        self.btn_method_config.setToolTip("Configure User defined input method (placeholder)")
+        self.btn_method_config.setToolTip("Configure User defined input method")
         self.btn_method_config.setEnabled(False)
+        self.btn_method_config.clicked.connect(self._on_user_defined_config)
         self.cmb_method.currentTextChanged.connect(self._update_method_config_btn)
         method_row = QHBoxLayout()
         method_row.addWidget(self.cmb_method)
