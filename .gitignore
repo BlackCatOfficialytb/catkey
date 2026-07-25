@@ -27,6 +27,7 @@ dist/
 *.pdb
 *.ilk
 test_runner*
+test_engine.exe
 
 # gettext compiled catalogs (regenerated from .po)
 *.mo
@@ -34,6 +35,8 @@ test_runner*
 # Runtime config / logs
 config.json
 *.log
+settings.toml
+temp_check.txt
 
 # Editor / OS
 .vscode/
