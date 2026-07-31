@@ -613,15 +613,26 @@ class CatKeyApp:
         # second keyboard hook (which caused doubled/tripled keystrokes).
         self._single = QSharedMemory("CatKey_SingleInstance_v1")
         if self._single.attach():
-            # Already running elsewhere: tell the user instead of failing silently.
-            self._is_primary = False
-            QMessageBox.information(
-                None, APP_NAME,
-                _("CatKey is already running.\n\n")
-                + _("Use the system tray icon to open the settings window."),
-            )
-            return
-        self._is_primary = self._single.create(1)
+            # If the previous process crashed, the segment is orphaned.
+            # A successful lock() on an orphaned segment means the old owner
+            # is dead — take ownership by detaching and re-creating.
+            orphaned = self._single.lock()
+            if orphaned:
+                self._single.unlock()
+            self._single.detach()
+            if orphaned:
+                self._single = QSharedMemory("CatKey_SingleInstance_v1")
+                self._is_primary = self._single.create(1)
+            else:
+                self._is_primary = False
+                QMessageBox.information(
+                    None, APP_NAME,
+                    _("CatKey is already running.\n\n")
+                    + _("Use the system tray icon to open the settings window."),
+                )
+                return
+        else:
+            self._is_primary = self._single.create(1)
 
         self.config = load_config()
         self.window = MainWindow(self.config)

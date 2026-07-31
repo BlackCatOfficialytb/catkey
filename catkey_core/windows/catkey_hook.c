@@ -290,6 +290,7 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
             wchar_t raw_w[BUF_MAX * 4];
             int ru = MultiByteToWideChar(CP_UTF8, 0, g_raw, g_raw_len, raw_w,
                                          BUF_MAX * 4 - 1);
+            if (ru <= 0) ru = 0;
             raw_w[ru] = 0;
             rewrite(g_shown_units, raw_w);
             /* The raw text is now on screen: track its units so a following
@@ -336,11 +337,29 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
     }
 
-    /* Backspace: shrink our buffer, recompute, and rewrite the screen. */
+    /* Backspace: shrink buffer and update the screen with remaining converted word.
+     * We bypass recompute_and_apply(0) because it would re-add 1 to g_shown_units,
+     * causing screen-unit drift. */
     if (vk == VK_BACK) {
         if (g_raw_len > 0) g_raw_len--;
-        if (g_shown_units > 0) g_shown_units--;
-        recompute_and_apply(0);
+        g_raw[g_raw_len] = 0;
+        if (g_raw_len == 0) {
+            if (g_shown_units > 0) {
+                rewrite(g_shown_units, L"");
+            }
+            g_shown_units = 0;
+        } else {
+            char utf8[BUF_MAX * 4];
+            int m = (int)InterlockedOr(&g_method, 0);
+            int n = catkey_convert_word(g_raw, utf8, sizeof(utf8), m);
+            if (n <= 0) { strcpy(utf8, g_raw); }
+            wchar_t wbuf[BUF_MAX * 2];
+            int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wbuf, BUF_MAX * 2);
+            if (wlen <= 0) wlen = 1;
+            wlen -= 1;
+            rewrite(g_shown_units, wbuf);
+            g_shown_units = wlen;
+        }
         return CallNextHookEx(g_hook, nCode, wParam, lParam);
     }
 
@@ -350,7 +369,7 @@ static LRESULT CALLBACK ll_proc(int nCode, WPARAM wParam, LPARAM lParam) {
         vk == VK_HOME || vk == VK_END || vk == VK_DELETE) {
         /* Auto-upper after sentence-ending punctuation (Enter . ! ?). */
         if (InterlockedOr(&g_auto_upper_cfg, 0) &&
-            (vk == VK_RETURN || vk == VK_OEM_PERIOD || vk == '1' || vk == VK_OEM_2)) {
+            (vk == VK_RETURN || vk == VK_OEM_PERIOD || vk == VK_OEM_1 || vk == VK_OEM_2)) {
             g_auto_upper = 1;
         } else {
             g_auto_upper = 0;

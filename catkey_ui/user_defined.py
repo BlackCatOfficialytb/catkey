@@ -31,7 +31,15 @@ def _data_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-_SETTINGS_PATH = _data_root() / "settings.toml"
+def _settings_path() -> Path:
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+    else:
+        base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / "CatKey" / "settings.toml"
+
+
+_SETTINGS_PATH = _settings_path()
 
 # Preset input methods users can load as a starting point.
 PRESETS = [
