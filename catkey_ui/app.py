@@ -269,18 +269,15 @@ class MainWindow(QMainWindow):
 
         spell_box = self._track(QGroupBox(), "Spelling", "setTitle")
         sb = QVBoxLayout(spell_box)
-        lbl_sp = QLabel(_("Spelling checks are not wired yet (alpha)."))
-        lbl_sp.setStyleSheet("color:#888; font-style:italic;")
-        sb.addWidget(lbl_sp)
-        sb.addWidget(self._chk("check_spelling", "Check basic spelling (WIP)"))
+        sb.addWidget(self._chk("check_spelling", "Check basic spelling"))
         sb.addWidget(self._chk("auto_restore_wrong_spelling",
-                               "Change back to original word on spelling mistake (WIP)"))
+                                "Restore original word on spelling mistake"))
         sb.addWidget(self._chk("allow_fwjz_consonants",
-                               "Allow f, w, j, z as Vietnamese consonants in spelling check (WIP)"))
+                                "Allow f, w, j, z as Vietnamese consonants in spelling"))
         sb.addWidget(self._chk("free_marking",
-                               "Free marking tone (behind the vowel or end of word) (WIP)"))
+                                "Free tone marking (place tone on last vowel)"))
         sb.addWidget(self._chk("auto_upper_after_punct",
-                               'Auto Upper Case after "Enter . ! ?"'))
+                                'Auto Upper Case after "Enter . ! ?"'))
         lay.addWidget(spell_box)
         lay.addStretch()
         return w
@@ -291,16 +288,13 @@ class MainWindow(QMainWindow):
 
         compat = self._track(QGroupBox(), "Compatibility", "setTitle")
         cb = QVBoxLayout(compat)
-        lbl_co = QLabel(_("Compatibility options are not wired yet (alpha)."))
-        lbl_co.setStyleSheet("color:#888; font-style:italic;")
-        cb.addWidget(lbl_co)
-        cb.addWidget(self._chk("modern_style", "Modern style (WIP)"))
+        cb.addWidget(self._chk("modern_style", "Modern style"))
         cb.addWidget(self._chk("standard_key_sending", "Use standard key sending (WIP)"))
         cb.addWidget(self._chk("use_clipboard_send", "Use Clipboard for send key (WIP)"))
         cb.addWidget(self._chk("support_metro",
-                               "Support Metro apps (Mail, Facebook, Messenger) (WIP)"))
+                                "Support Metro apps (Mail, Facebook, Messenger) (WIP)"))
         cb.addWidget(self._chk("fix_browser_excel",
-                               "Correct Vietnamese on browser address bar / Excel (WIP)"))
+                                "Correct Vietnamese on browser address bar / Excel (WIP)"))
         lay.addWidget(compat)
 
         system = self._track(QGroupBox(), "System", "setTitle")
@@ -709,8 +703,15 @@ class CatKeyApp:
         hook_set_enabled(bool(self.config.get("vietnamese_on", True)))
         # Push the exception-apps list so the hook skips conversion in those.
         from .core import hook_set_exception_apps, hook_set_auto_upper
+        from .core import set_check_spelling, set_auto_restore, set_allow_fwjz, set_free_marking, set_modern_style
         hook_set_exception_apps(self.config.get("exception_apps", []))
         hook_set_auto_upper(bool(self.config.get("auto_upper_after_punct", False)))
+        # Spelling options
+        set_check_spelling(bool(self.config.get("check_spelling", True)))
+        set_auto_restore(bool(self.config.get("auto_restore_wrong_spelling", True)))
+        set_allow_fwjz(bool(self.config.get("allow_fwjz_consonants", False)))
+        set_free_marking(bool(self.config.get("free_marking", False)))
+        set_modern_style(bool(self.config.get("modern_style", True)))
 
     def _toggle_vietnamese(self):
         """Toggle the Vietnamese typing engine on/off (tray + hotkey)."""
