@@ -17,7 +17,7 @@ _METHOD_TEIP = 1
 _METHOD_VNI = 2
 _METHOD_VIQR = 3
 _METHOD_TEIP_VNI = 4
-_MAX_OUTPUT = 128
+_MAX_OUTPUT = 256
 
 def _data_root() -> Path:
     base = getattr(sys, "_MEIPASS", None)
@@ -60,6 +60,11 @@ def _bind(lib):
         lib.catkey_set_reset_key.argtypes = [ctypes.c_int, ctypes.c_int]
         lib.catkey_set_exception_apps.argtypes = [ctypes.c_char_p]
         lib.catkey_set_auto_upper.argtypes = [ctypes.c_int]
+        lib.catkey_set_check_spelling.argtypes = [ctypes.c_int]
+        lib.catkey_set_auto_restore.argtypes = [ctypes.c_int]
+        lib.catkey_set_allow_fwjz.argtypes = [ctypes.c_int]
+        lib.catkey_set_free_marking.argtypes = [ctypes.c_int]
+        lib.catkey_set_modern_style.argtypes = [ctypes.c_int]
         lib.catkey_is_running.restype = ctypes.c_int
         _HAS_HOOK = True
     except AttributeError:
@@ -178,8 +183,15 @@ def convert_word(word: str, method: str) -> str:
         return word
     m = {'vni': _METHOD_VNI, 'viqr': _METHOD_VIQR,
          'teip_vni': _METHOD_TEIP_VNI}.get(method, _METHOD_TEIP)
+    raw = word.encode("utf-8")
+    limit = _MAX_OUTPUT - 1
+    if len(raw) > limit:
+        raw = raw[:limit]
+        while raw and (raw[-1] & 0xC0) == 0x80:
+            raw = raw[:-1]
+    src = raw
     buf = ctypes.create_string_buffer(_MAX_OUTPUT)
-    n = _LIB.catkey_convert_word(word.encode("utf-8"), buf, _MAX_OUTPUT, m)
+    n = _LIB.catkey_convert_word(src, buf, _MAX_OUTPUT, m)
     if n <= 0:
         return word
     return buf.raw[:n].decode("utf-8", errors="replace")
@@ -253,10 +265,46 @@ def hook_set_exception_apps(apps: list) -> None:
     When the foreground window belongs to one of these, conversion is skipped."""
     if hook_available():
         s = ",".join(a.strip().lower() for a in apps if a.strip())
-        _LIB.catkey_set_exception_apps(s.encode("utf-8") if s else b"")
+        # EXC_MAX in catkey_hook.c is 512; truncate to prevent overflow
+        encoded = (s.encode("utf-8") if s else b"")
+        if len(encoded) > 510:
+            encoded = encoded[:510]
+            while encoded and (encoded[-1] & 0xC0) == 0x80:
+                encoded = encoded[:-1]
+        _LIB.catkey_set_exception_apps(encoded)
 
 
 def hook_set_auto_upper(on: bool) -> None:
     """Enable/disable auto-uppercase after sentence-ending punctuation."""
     if hook_available():
         _LIB.catkey_set_auto_upper(1 if on else 0)
+
+
+def set_check_spelling(on: bool) -> None:
+    """Enable/disable Vietnamese spelling check in the C core."""
+    if core_available() and hasattr(_LIB, "catkey_set_check_spelling"):
+        _LIB.catkey_set_check_spelling(1 if on else 0)
+
+
+def set_auto_restore(on: bool) -> None:
+    """Enable/disable auto-restore to raw input when spelling check fails."""
+    if core_available() and hasattr(_LIB, "catkey_set_auto_restore"):
+        _LIB.catkey_set_auto_restore(1 if on else 0)
+
+
+def set_allow_fwjz(on: bool) -> None:
+    """Allow f, w, j, z as valid consonants in spelling check."""
+    if core_available() and hasattr(_LIB, "catkey_set_allow_fwjz"):
+        _LIB.catkey_set_allow_fwjz(1 if on else 0)
+
+
+def set_free_marking(on: bool) -> None:
+    """Enable/disable free tone marking (always place tone on last vowel)."""
+    if core_available() and hasattr(_LIB, "catkey_set_free_marking"):
+        _LIB.catkey_set_free_marking(1 if on else 0)
+
+
+def set_modern_style(on: bool) -> None:
+    """Enable/disable modern tone placement style (oa/oe/uy on 2nd vowel)."""
+    if core_available() and hasattr(_LIB, "catkey_set_modern_style"):
+        _LIB.catkey_set_modern_style(1 if on else 0)
