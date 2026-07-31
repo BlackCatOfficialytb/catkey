@@ -485,10 +485,10 @@ class MainWindow(QMainWindow):
     def _restore_defaults(self):
         from .config import DEFAULT_CONFIG
         import json
-        # Mutate in place so app + window keep sharing one config dict.
         self.config.clear()
         self.config.update(json.loads(json.dumps(DEFAULT_CONFIG)))
         self._load_values()
+        self.config_changed.emit(self.config)
 
     # -- Preview (C core) -------------------------------------------------
 
@@ -655,6 +655,12 @@ class CatKeyApp:
         if not hook_available():
             self._start_hotkey()
 
+        # Periodically poll the C hook to detect native toggles (e.g. hotkey
+        # fired from the C layer independently of the Python UI).
+        self._poll_timer = QTimer()
+        self._poll_timer.timeout.connect(self._poll_engine_state)
+        self._poll_timer.start(1500)
+
         # Warn about conflicting Vietnamese input tools running in background.
         QTimer.singleShot(800, self._check_conflicts)
 
@@ -666,8 +672,8 @@ class CatKeyApp:
         self._hotkey = HotkeyListener(combo, self._hk_bridge.triggered.emit)
         self._hotkey.start()
 
-    def _sync_from_engine(self):
-        """(Unused) engine no longer self-toggles; kept for compatibility."""
+    def _poll_engine_state(self):
+        """Periodically sync the UI tray/menu state with the C hook engine."""
         if not hook_available():
             return
         engine_on = hook_get_enabled()
@@ -677,11 +683,12 @@ class CatKeyApp:
             self.tray.setIcon(_cat_icon(engine_on))
             self.tray.setContextMenu(self._build_menu())
             self._update_tooltip()
-            self.tray.showMessage(
-                APP_NAME,
-                _("Vietnamese typing ON") if engine_on else _("Vietnamese typing OFF"),
-                QSystemTrayIcon.Information, 1200,
-            )
+            if self.config.get("notify_on_toggle", True):
+                self.tray.showMessage(
+                    APP_NAME,
+                    _("Vietnamese typing ON") if engine_on else _("Vietnamese typing OFF"),
+                    QSystemTrayIcon.Information, 1200,
+                )
 
     def _apply_hotkeys(self):
         """Push the toggle + restore + reset shortkeys from config into the C hook."""
